@@ -20,7 +20,7 @@ export default class MediaDevicesManager {
     this._videoDevices = [];
     this._deviceId = null;
     this._audioTrack = null;
-    this._mediaStream = null;
+    this._mediaStream = new MediaStream();
 
     navigator.mediaDevices.addEventListener("devicechange", this.onDeviceChange);
   }

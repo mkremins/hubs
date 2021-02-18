@@ -974,6 +974,7 @@ class UIRoot extends Component {
         </div>
       );
     }
+    if (this.props.isBotMode) return this.renderBotMode();
     if (isLoading) {
       return <LoadingScreenContainer scene={this.props.scene} onLoaded={this.onLoadingFinished} />;
     }
@@ -990,7 +991,6 @@ class UIRoot extends Component {
     }
 
     if (this.props.showInterstitialPrompt) return this.renderInterstitialPrompt();
-    if (this.props.isBotMode) return this.renderBotMode();
 
     const entered = this.state.entered;
     const watching = this.state.watching;
