@@ -355,12 +355,16 @@ export default class DialogAdapter {
     const protooTransport = new protooClient.WebSocketTransport(urlWithParams.toString());
     this._protoo = new protooClient.Peer(protooTransport);
 
-    await new Promise(res => {
+    await new Promise((resolve, reject) => {
       this._protoo.on("open", async () => {
         this.emitRTCEvent("info", "Signaling", () => `Open`);
         this._closed = false;
-        await this._joinRoom();
-        res();
+        try {
+          await this._joinRoom();
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
       });
     });
 
@@ -616,177 +620,168 @@ export default class DialogAdapter {
   async _joinRoom() {
     debug("_joinRoom()");
 
-    try {
-      this._mediasoupDevice = new mediasoupClient.Device({});
+    this._mediasoupDevice = new mediasoupClient.Device({});
 
-      const routerRtpCapabilities = await this._protoo.request("getRouterRtpCapabilities");
+    const routerRtpCapabilities = await this._protoo.request("getRouterRtpCapabilities");
 
-      await this._mediasoupDevice.load({ routerRtpCapabilities });
+    await this._mediasoupDevice.load({ routerRtpCapabilities });
 
-      const { host, port, turn } = await window.APP.hubChannel.getHost();
-      const iceServers = this.getIceServers(host, port, turn);
+    const { host, port, turn } = await window.APP.hubChannel.getHost();
+    const iceServers = this.getIceServers(host, port, turn);
 
-      // Create mediasoup Transport for sending (unless we don't want to produce).
-      const sendTransportInfo = await this._protoo.request("createWebRtcTransport", {
-        producing: true,
-        consuming: false,
-        sctpCapabilities: undefined
+    // Create mediasoup Transport for sending (unless we don't want to produce).
+    const sendTransportInfo = await this._protoo.request("createWebRtcTransport", {
+      producing: true,
+      consuming: false,
+      sctpCapabilities: undefined
+    });
+
+    this._sendTransport = this._mediasoupDevice.createSendTransport({
+      id: sendTransportInfo.id,
+      iceParameters: sendTransportInfo.iceParameters,
+      iceCandidates: sendTransportInfo.iceCandidates,
+      dtlsParameters: sendTransportInfo.dtlsParameters,
+      sctpParameters: sendTransportInfo.sctpParameters,
+      iceServers,
+      iceTransportPolicy: this._iceTransportPolicy,
+      proprietaryConstraints: PC_PROPRIETARY_CONSTRAINTS
+    });
+
+    this._sendTransport.on("connect", (
+      { dtlsParameters },
+      callback,
+      errback // eslint-disable-line no-shadow
+    ) => {
+      this.emitRTCEvent("info", "RTC", () => `Send transport [connect]`);
+      this._sendTransport.observer.on("close", () => {
+        this.emitRTCEvent("info", "RTC", () => `Send transport [close]`);
+      });
+      this._sendTransport.observer.on("newproducer", producer => {
+        this.emitRTCEvent("info", "RTC", () => `Send transport [newproducer]: ${producer.id}`);
+      });
+      this._sendTransport.observer.on("newconsumer", consumer => {
+        this.emitRTCEvent("info", "RTC", () => `Send transport [newconsumer]: ${consumer.id}`);
       });
 
-      this._sendTransport = this._mediasoupDevice.createSendTransport({
-        id: sendTransportInfo.id,
-        iceParameters: sendTransportInfo.iceParameters,
-        iceCandidates: sendTransportInfo.iceCandidates,
-        dtlsParameters: sendTransportInfo.dtlsParameters,
-        sctpParameters: sendTransportInfo.sctpParameters,
-        iceServers,
-        iceTransportPolicy: this._iceTransportPolicy,
-        proprietaryConstraints: PC_PROPRIETARY_CONSTRAINTS
-      });
+      this._protoo
+        .request("connectWebRtcTransport", {
+          transportId: this._sendTransport.id,
+          dtlsParameters
+        })
+        .then(callback)
+        .catch(errback);
+    });
 
-      this._sendTransport.on("connect", (
-        { dtlsParameters },
-        callback,
-        errback // eslint-disable-line no-shadow
-      ) => {
-        this.emitRTCEvent("info", "RTC", () => `Send transport [connect]`);
-        this._sendTransport.observer.on("close", () => {
-          this.emitRTCEvent("info", "RTC", () => `Send transport [close]`);
-        });
-        this._sendTransport.observer.on("newproducer", producer => {
-          this.emitRTCEvent("info", "RTC", () => `Send transport [newproducer]: ${producer.id}`);
-        });
-        this._sendTransport.observer.on("newconsumer", consumer => {
-          this.emitRTCEvent("info", "RTC", () => `Send transport [newconsumer]: ${consumer.id}`);
-        });
-
-        this._protoo
-          .request("connectWebRtcTransport", {
-            transportId: this._sendTransport.id,
-            dtlsParameters
-          })
-          .then(callback)
-          .catch(errback);
-      });
-
-      this._sendTransport.on("connectionstatechange", connectionState => {
-        let level = "info";
-        if (connectionState === "failed" || connectionState === "disconnected") {
-          level = "error";
-        }
-        this.emitRTCEvent(level, "RTC", () => `Send transport [connectionstatechange]: ${connectionState}`);
-
-        this.checkSendIceStatus(connectionState);
-      });
-
-      this._sendTransport.on("produce", async ({ kind, rtpParameters, appData }, callback, errback) => {
-        this.emitRTCEvent("info", "RTC", () => `Send transport [produce]: ${kind}`);
-        try {
-          // eslint-disable-next-line no-shadow
-          const { id } = await this._protoo.request("produce", {
-            transportId: this._sendTransport.id,
-            kind,
-            rtpParameters,
-            appData
-          });
-
-          callback({ id });
-        } catch (error) {
-          this.emitRTCEvent("error", "Signaling", () => `[produce] error: ${error}`);
-          errback(error);
-        }
-      });
-
-      // Create mediasoup Transport for sending (unless we don't want to consume).
-      const recvTransportInfo = await this._protoo.request("createWebRtcTransport", {
-        producing: false,
-        consuming: true,
-        sctpCapabilities: undefined
-      });
-
-      this._recvTransport = this._mediasoupDevice.createRecvTransport({
-        id: recvTransportInfo.id,
-        iceParameters: recvTransportInfo.iceParameters,
-        iceCandidates: recvTransportInfo.iceCandidates,
-        dtlsParameters: recvTransportInfo.dtlsParameters,
-        sctpParameters: recvTransportInfo.sctpParameters,
-        iceServers,
-        iceTransportPolicy: this._iceTransportPolicy
-      });
-
-      this._recvTransport.on("connect", (
-        { dtlsParameters },
-        callback,
-        errback // eslint-disable-line no-shadow
-      ) => {
-        this.emitRTCEvent("info", "RTC", () => `Receive transport [connect]`);
-        this._recvTransport.observer.on("close", () => {
-          this.emitRTCEvent("info", "RTC", () => `Receive transport [close]`);
-        });
-        this._recvTransport.observer.on("newproducer", producer => {
-          this.emitRTCEvent("info", "RTC", () => `Receive transport [newproducer]: ${producer.id}`);
-        });
-        this._recvTransport.observer.on("newconsumer", consumer => {
-          this.emitRTCEvent("info", "RTC", () => `Receive transport [newconsumer]: ${consumer.id}`);
-        });
-
-        this._protoo
-          .request("connectWebRtcTransport", {
-            transportId: this._recvTransport.id,
-            dtlsParameters
-          })
-          .then(callback)
-          .catch(errback);
-      });
-
-      this._recvTransport.on("connectionstatechange", connectionState => {
-        let level = "info";
-        if (connectionState === "failed" || connectionState === "disconnected") {
-          level = "error";
-        }
-        this.emitRTCEvent(level, "RTC", () => `Receive transport [connectionstatechange]: ${connectionState}`);
-
-        this.checkRecvIceStatus(connectionState);
-      });
-
-      const { peers } = await this._protoo.request("join", {
-        displayName: this._clientId,
-        device: this._device,
-        rtpCapabilities: this._mediasoupDevice.rtpCapabilities,
-        sctpCapabilities: this._useDataChannel ? this._mediasoupDevice.sctpCapabilities : undefined,
-        token: this._joinToken
-      });
-
-      const audioConsumerPromises = [];
-      this.occupants = {};
-
-      // Create a promise that will be resolved once we attach to all the initial consumers.
-      // This will gate the connection flow until all voices will be heard.
-      for (let i = 0; i < peers.length; i++) {
-        const peerId = peers[i].id;
-        this._onOccupantConnected(peerId);
-        this.occupants[peerId] = peers[i];
-        if (!peers[i].hasProducers) continue;
-        audioConsumerPromises.push(new Promise(res => this._initialAudioConsumerResolvers.set(peerId, res)));
+    this._sendTransport.on("connectionstatechange", connectionState => {
+      let level = "info";
+      if (connectionState === "failed" || connectionState === "disconnected") {
+        level = "error";
       }
+      this.emitRTCEvent(level, "RTC", () => `Send transport [connectionstatechange]: ${connectionState}`);
 
-      this._connectSuccess(this._clientId);
-      this._initialAudioConsumerPromise = Promise.all(audioConsumerPromises);
+      this.checkSendIceStatus(connectionState);
+    });
 
-      if (this._onOccupantsChanged) {
-        this._onOccupantsChanged(this.occupants);
+    this._sendTransport.on("produce", async ({ kind, rtpParameters, appData }, callback, errback) => {
+      this.emitRTCEvent("info", "RTC", () => `Send transport [produce]: ${kind}`);
+      try {
+        // eslint-disable-next-line no-shadow
+        const { id } = await this._protoo.request("produce", {
+          transportId: this._sendTransport.id,
+          kind,
+          rtpParameters,
+          appData
+        });
+
+        callback({ id });
+      } catch (error) {
+        this.emitRTCEvent("error", "Signaling", () => `[produce] error: ${error}`);
+        errback(error);
       }
+    });
 
-      if (this._localMediaStream) {
-        this.createMissingProducers(this._localMediaStream);
-      }
-    } catch (err) {
-      this.emitRTCEvent("error", "Adapter", () => `Join room failed: ${error}`);
-      error("_joinRoom() failed:%o", err);
+    // Create mediasoup Transport for sending (unless we don't want to consume).
+    const recvTransportInfo = await this._protoo.request("createWebRtcTransport", {
+      producing: false,
+      consuming: true,
+      sctpCapabilities: undefined
+    });
 
-      if (!this._reconnectionTimeout) {
-        this._reconnectionTimeout = setTimeout(() => this.reconnect(), this._reconnectionDelay);
+    this._recvTransport = this._mediasoupDevice.createRecvTransport({
+      id: recvTransportInfo.id,
+      iceParameters: recvTransportInfo.iceParameters,
+      iceCandidates: recvTransportInfo.iceCandidates,
+      dtlsParameters: recvTransportInfo.dtlsParameters,
+      sctpParameters: recvTransportInfo.sctpParameters,
+      iceServers,
+      iceTransportPolicy: this._iceTransportPolicy
+    });
+
+    this._recvTransport.on("connect", (
+      { dtlsParameters },
+      callback,
+      errback // eslint-disable-line no-shadow
+    ) => {
+      this.emitRTCEvent("info", "RTC", () => `Receive transport [connect]`);
+      this._recvTransport.observer.on("close", () => {
+        this.emitRTCEvent("info", "RTC", () => `Receive transport [close]`);
+      });
+      this._recvTransport.observer.on("newproducer", producer => {
+        this.emitRTCEvent("info", "RTC", () => `Receive transport [newproducer]: ${producer.id}`);
+      });
+      this._recvTransport.observer.on("newconsumer", consumer => {
+        this.emitRTCEvent("info", "RTC", () => `Receive transport [newconsumer]: ${consumer.id}`);
+      });
+
+      this._protoo
+        .request("connectWebRtcTransport", {
+          transportId: this._recvTransport.id,
+          dtlsParameters
+        })
+        .then(callback)
+        .catch(errback);
+    });
+
+    this._recvTransport.on("connectionstatechange", connectionState => {
+      let level = "info";
+      if (connectionState === "failed" || connectionState === "disconnected") {
+        level = "error";
       }
+      this.emitRTCEvent(level, "RTC", () => `Receive transport [connectionstatechange]: ${connectionState}`);
+
+      this.checkRecvIceStatus(connectionState);
+    });
+
+    const { peers } = await this._protoo.request("join", {
+      displayName: this._clientId,
+      device: this._device,
+      rtpCapabilities: this._mediasoupDevice.rtpCapabilities,
+      sctpCapabilities: this._useDataChannel ? this._mediasoupDevice.sctpCapabilities : undefined,
+      token: this._joinToken
+    });
+
+    const audioConsumerPromises = [];
+    this.occupants = {};
+
+    // Create a promise that will be resolved once we attach to all the initial consumers.
+    // This will gate the connection flow until all voices will be heard.
+    for (let i = 0; i < peers.length; i++) {
+      const peerId = peers[i].id;
+      this._onOccupantConnected(peerId);
+      this.occupants[peerId] = peers[i];
+      if (!peers[i].hasProducers) continue;
+      audioConsumerPromises.push(new Promise(res => this._initialAudioConsumerResolvers.set(peerId, res)));
+    }
+
+    this._connectSuccess(this._clientId);
+    this._initialAudioConsumerPromise = Promise.all(audioConsumerPromises);
+
+    if (this._onOccupantsChanged) {
+      this._onOccupantsChanged(this.occupants);
+    }
+
+    if (this._localMediaStream) {
+      this.createMissingProducers(this._localMediaStream);
     }
 
     // Start the ICE connection state watchdogs
@@ -983,7 +978,7 @@ export default class DialogAdapter {
         }
 
         if (!this._reconnectionTimeout) {
-          this._reconnectionTimeout = setTimeout(() => this.reconnect(), this._reconnectionDelay);
+          this._reconnectionTimeout = setInterval(() => this.reconnect(), this._reconnectionDelay);
         }
       });
   }
