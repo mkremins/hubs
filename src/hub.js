@@ -555,28 +555,19 @@ function handleHubChannelJoined(entryManager, hubChannel, messageDispatch, data)
     while (!scene.components["networked-scene"] || !scene.components["networked-scene"].data) await nextTick();
 
     scene.addEventListener("adapter-ready", ({ detail: adapter }) => {
-      let newHostPollInterval = null;
-
-      // When reconnecting, update the server URL if necessary
+      // We don't need to update the server URL when reconnecting, it's always updated every time we join a room
       adapter.setReconnectionListeners(
         () => {
-          if (newHostPollInterval) return;
-
-          newHostPollInterval = setInterval(async () => {
-            const currentServerURL = scene.getAttribute("networked-scene").serverURL;
-            const newServerURL = adapter.serverURL;
-            if (currentServerURL !== newServerURL) {
-              console.log("Connecting to new Janus server " + newServerURL);
-              scene.setAttribute("networked-scene", { serverURL: newServerURL });
-              adapter.serverUrl = newServerURL;
-            }
-          }, 1000);
+          console.log("Reconnecting...");
         },
         () => {
-          clearInterval(newHostPollInterval);
-          newHostPollInterval = null;
+          console.log("Reconnected");
         },
-        null
+        err => {
+          console.log("Reconnection error", err);
+          remountUI({ roomUnavailableReason: ExitReason.connectError });
+          entryManager.exitScene();
+        }
       );
 
       const sendViaPhoenix = reliable => (clientId, dataType, data) => {

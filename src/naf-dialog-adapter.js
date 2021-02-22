@@ -347,7 +347,7 @@ export default class DialogAdapter {
     this._recvTaskId = null;
   }
 
-  async connect() {
+  async connect(isInitial = true) {
     const urlWithParams = new URL(this._serverUrl);
     urlWithParams.searchParams.append("roomId", this._roomId);
     urlWithParams.searchParams.append("peerId", this._clientId);
@@ -363,7 +363,11 @@ export default class DialogAdapter {
           await this._joinRoom();
           resolve();
         } catch (err) {
-          reject(err);
+          if (isInitial) {
+            this.reconnect();
+          } else {
+            reject(err);
+          }
         }
       });
     });
@@ -943,11 +947,11 @@ export default class DialogAdapter {
     this._lastSendConnectionState = null;
   }
 
-  reconnect() {
+  reconnect(maxReconnectionAttempts) {
     // Dispose of all networked entities and other resources tied to the session.
     this.disconnect();
 
-    this.connect()
+    this.connect(false)
       .then(() => {
         this._reconnectionDelay = INITIAL_ROOM_RECONNECTION_INTERVAL;
         this._reconnectionAttempts = 0;
@@ -963,7 +967,7 @@ export default class DialogAdapter {
         this._reconnectionDelay += 1000;
         this._reconnectionAttempts++;
 
-        if (this._reconnectionAttempts > this.max_reconnectionAttempts && this._reconnectionErrorListener) {
+        if (this._reconnectionAttempts > maxReconnectionAttempts && this._reconnectionErrorListener) {
           return this._reconnectionErrorListener(
             new Error("Connection could not be reestablished, exceeded maximum number of reconnection attempts.")
           );
@@ -978,7 +982,10 @@ export default class DialogAdapter {
         }
 
         if (!this._reconnectionTimeout) {
-          this._reconnectionTimeout = setInterval(() => this.reconnect(), this._reconnectionDelay);
+          this._reconnectionTimeout = setInterval(
+            () => this.reconnect(maxReconnectionAttempts),
+            this._reconnectionDelay
+          );
         }
       });
   }
