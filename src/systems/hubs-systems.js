@@ -30,6 +30,7 @@ import { AudioSystem } from "./audio-system";
 import { ShadowSystem } from "./shadow-system";
 import { MediaFramesSystem } from "./media-frames";
 import { InspectYourselfSystem } from "./inspect-yourself-system";
+import { DataVisualizationSystem } from "./datavisualization-system";
 
 AFRAME.registerSystem("hubs-systems", {
   init() {
@@ -69,6 +70,7 @@ AFRAME.registerSystem("hubs-systems", {
     this.shadowSystem = new ShadowSystem(this.el);
     this.mediaFramesSystem = new MediaFramesSystem(this.physicsSystem, this.el.systems.interaction);
     this.inspectYourselfSystem = new InspectYourselfSystem();
+    this.datavisualizationSystem = new DataVisualizationSystem(this.el);
   },
 
   tick(t, dt) {
@@ -116,6 +118,9 @@ AFRAME.registerSystem("hubs-systems", {
 
     // We run this late in the frame so that its the last thing to have an opinion about the scale of an object
     this.boneVisibilitySystem.tick();
+
+    // Data visualization shouldn't impact other things
+    this.datavisualizationSystem.tick();
   },
 
   remove() {
