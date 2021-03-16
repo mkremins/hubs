@@ -24,5 +24,3 @@ function Root() {
 }
 
 ReactDOM.render(<Root />, document.getElementById("home-root"));
-
-console.log("!!!HELLO FROM CUSTOM CLIENT SCRIPT!!!");
