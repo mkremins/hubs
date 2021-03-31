@@ -33,33 +33,22 @@ function initMaxAdditions(scene) {
   clearInterval(interval);
   console.log("!!!initMaxAdditions!!!");
 
-  // add the speechOrb template to the DOM
-  const assetsEl = document.querySelector("a-assets");
-  const orbTemplate = createElement(`
-  <template id="speechOrb-drawing">
-    <a-entity class="speechOrb"
-              geometry="primitive:sphere"
-              material="color:yellow;shader:flat">
-    </a-entity>
-  </template>
-  `);
-  assetsEl.appendChild(orbTemplate);
+  // when we receive an utterance from another client, call handleUtterance
+  NAF.connection.subscribeToDataChannel("utterance", handleUtterance);
 
-  // add a NAF schema to sync physics + color across network
-  NAF.schemas.add({
-    template: "#speechOrb-drawing",
-    components: [
-      "position", "rotation", "scale", "material",
-      "body-helper", "shape-helper"
-    ]
-  });
-
+  // periodically poll for voice input to spawn utterances for this client
   setInterval(speechTick, 20);
 }
 
 
+function handleUtterance(senderId, dataType, data, targetId) {
+  console.log(senderId, dataType, data, targetId);
+  spawnOrb(data, "red");
+}
+
+
 function spawnOrb(size, color) {
-  color = color || "red";
+  color = color || "yellow";
   console.log("spawnOrb", size, color);
 
   // get the avatar position for orb placement
@@ -68,9 +57,9 @@ function spawnOrb(size, color) {
 
   // create, color, position, and scale the orb
   const orb = document.createElement("a-entity");
-  orb.setAttribute("networked", "template:#speechOrb-drawing");
-  orb.setAttribute("material", `color:${color};shader:flat`); // FIXME doesn't work
-  orb.setAttribute("position", `${avatar.position.x} 5 ${avatar.position.z}`);
+  orb.setAttribute("geometry", "primitive:sphere");
+  orb.setAttribute("material", `color:${color};shader:flat`);
+  orb.setAttribute("position", `0 5 0`);
   orb.setAttribute("scale", `${size} ${size} ${size}`);
 
   // add physics and a collider
@@ -95,8 +84,10 @@ let continuousSpeechLeniencyTicks = 0;
 let ticksOfContinuousSpeech = 0;
 
 function speechTick() {
+  const playerInfo = APP.componentRegistry["player-info"][0];
+  const muted = playerInfo.data.muted;
   const localAudioAnalyser = window.APP.scene.systems["local-audio-analyser"];
-  const speaking = localAudioAnalyser.volume > MIC_PRESENCE_VOLUME_THRESHOLD;
+  const speaking = !muted && localAudioAnalyser.volume > MIC_PRESENCE_VOLUME_THRESHOLD;
   if (speaking) {
     ticksOfContinuousSpeech += 1;
     continuousSpeechLeniencyTicks = CONTINUOUS_SPEECH_LENIENCY_TICKS;
@@ -108,7 +99,9 @@ function speechTick() {
     if (continuousSpeechLeniencyTicks <= 0
         && ticksOfContinuousSpeech >= MIN_SPEECH_TICKS_FOR_EVENT) {
       // speech event ended
-      spawnOrb(ticksOfContinuousSpeech * 0.005);
+      const orbSize = ticksOfContinuousSpeech * 0.005;
+      spawnOrb(orbSize);
+      NAF.connection.broadcastData("utterance", orbSize);
       ticksOfContinuousSpeech = 0;
     }
   }
