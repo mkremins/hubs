@@ -1,3 +1,6 @@
+import { COLLISION_LAYERS } from "./constants";
+import { SHAPE, TYPE } from "three-ammo/constants";
+
 console.log("!!!max-additions.js!!!");
 
 /// utils
@@ -17,7 +20,7 @@ function randInt(min, max) {
 /// constants
 
 const MIC_PRESENCE_VOLUME_THRESHOLD = 0.00001;
-const SPEECH_ORB_LIFETIME = 10000;
+const SPEECH_ORB_LIFETIME = 1000 * 30;
 const MIN_SPEECH_TICKS_FOR_EVENT = 10;
 const CONTINUOUS_SPEECH_LENIENCY_TICKS = 5;
 
@@ -46,7 +49,8 @@ function initMaxAdditions(scene) {
   NAF.schemas.add({
     template: "#speechOrb-drawing",
     components: [
-      "position", "rotation", "scale", "material", "body-helper",
+      "position", "rotation", "scale", "material",
+      "body-helper", "shape-helper"
     ]
   });
 
@@ -66,16 +70,15 @@ function spawnOrb(size, color) {
   const orb = document.createElement("a-entity");
   orb.setAttribute("networked", "template:#speechOrb-drawing");
   orb.setAttribute("material", `color:${color};shader:flat`); // FIXME doesn't work
-  orb.setAttribute("position", `${avatar.position.x} 3 ${avatar.position.z}`);
+  orb.setAttribute("position", `${avatar.position.x} 5 ${avatar.position.z}`);
   orb.setAttribute("scale", `${size} ${size} ${size}`);
 
-  /*
-  // add physics (FIXME wow this is broken)
+  // add physics and a collider
   orb.setAttribute("body-helper", {
-    //collisionFilterMask: -1, // FIXME doesn't actually collide with anything i think
-    gravity: {x: 0, y: -1, z: 0}
+    collisionFilterMask: COLLISION_LAYERS.ALL,
+    gravity: {x: 0, y: -9.8, z: 0}
   });
-  */
+  orb.setAttribute("shape-helper", {type: SHAPE.SPHERE});
 
   // add the orb to the scene
   APP.scene.appendChild(orb);
@@ -105,7 +108,7 @@ function speechTick() {
     if (continuousSpeechLeniencyTicks <= 0
         && ticksOfContinuousSpeech >= MIN_SPEECH_TICKS_FOR_EVENT) {
       // speech event ended
-      spawnOrb(ticksOfContinuousSpeech * 0.01);
+      spawnOrb(ticksOfContinuousSpeech * 0.005);
       ticksOfContinuousSpeech = 0;
     }
   }
