@@ -65,7 +65,7 @@ function spawnOrb(size, color) {
   // create, color, position, and scale the orb
   const orb = document.createElement("a-entity");
   orb.setAttribute("networked", "template:#speechOrb-drawing");
-  //orb.setAttribute("material", `color:${color};shader:flat`); // FIXME doesn't work
+  orb.setAttribute("material", `color:${color};shader:flat`); // FIXME doesn't work
   orb.setAttribute("position", `${avatar.position.x} 3 ${avatar.position.z}`);
   orb.setAttribute("scale", `${size} ${size} ${size}`);
 
