@@ -11,6 +11,12 @@ function createElement(htmlString) {
   return div.firstChild; 
 }
 
+function scale(num, oldLower, oldUpper, newLower, newUpper) {
+  const oldRange = oldUpper - oldLower;
+  const newRange = newUpper - newLower;
+  return (((num - oldLower) / oldRange) * newRange) + newLower;
+}
+
 function randInt(min, max) {
   min = Math.ceil(min);
   max = Math.floor(max);
@@ -20,12 +26,19 @@ function randInt(min, max) {
 /// constants
 
 const MIC_PRESENCE_VOLUME_THRESHOLD = 0.00001;
-const SPEECH_ORB_LIFETIME = 1000 * 30;
-const MIN_SPEECH_TICKS_FOR_EVENT = 10;
-const CONTINUOUS_SPEECH_LENIENCY_TICKS = 5;
+
+const SPEECH_TIME_PER_TICK = 10; // every speech tick = 10ms of realtime
+const MIN_SPEECH_TIME_FOR_EVENT = 100; // 0.1s realtime
+const MAX_SPEECH_TIME_FOR_EVENT = 5000; // 5s realtime
+const CONTINUOUS_SPEECH_LENIENCY_TIME = 100; // 0.1s realtime
+
 const ORB_CONTAINER_POS = [7,0,2]; //[0,0,0]
 const ORB_CONTAINER_SIZE = 1;
 const ORB_CONTAINER_DEPTH = 4;
+
+const MIN_ORB_SIZE = 0.05;
+const MAX_ORB_SIZE = 0.9;
+const SPEECH_ORB_LIFETIME = 1000 * 30;
 
 /// main code
 
@@ -40,7 +53,7 @@ function initMaxAdditions(scene) {
   NAF.connection.subscribeToDataChannel("utterance", handleUtterance);
 
   // periodically poll for voice input to spawn utterances for this client
-  setInterval(speechTick, 20);
+  setInterval(speechTick, SPEECH_TIME_PER_TICK);
 
   // spawn orb container
   const radius = ORB_CONTAINER_SIZE;
@@ -62,7 +75,7 @@ function initMaxAdditions(scene) {
       height: ORB_CONTAINER_DEPTH,
       depth: isVert ? radius * 2 : "0.1"
     });
-    wall.setAttribute("material", "color:orange;transparent:true;opacity:0.5");
+    wall.setAttribute("material", "color:white;transparent:true;opacity:0.5");
     wall.setAttribute("position", wallPositions[i]);
     wall.setAttribute("body-helper", {type: TYPE.STATIC});
     wall.setAttribute("shape-helper", {type: SHAPE.BOX});
@@ -90,10 +103,9 @@ function spawnOrb(size, color) {
   // create, color, position, and scale the orb
   const pos = ORB_CONTAINER_POS;
   const orb = document.createElement("a-entity");
-  orb.setAttribute("geometry", "primitive:sphere");
+  orb.setAttribute("geometry", `primitive:sphere;radius:${size}`);
   orb.setAttribute("material", `color:${color};shader:flat`);
   orb.setAttribute("position", `${pos[0]} ${pos[1] + 5} ${pos[2]}`);
-  orb.setAttribute("scale", `${size} ${size} ${size}`);
 
   // add physics and a collider
   orb.setAttribute("body-helper", {
@@ -113,8 +125,20 @@ function spawnOrb(size, color) {
 
 
 // track how much the local user is talking
-let continuousSpeechLeniencyTicks = 0;
-let ticksOfContinuousSpeech = 0;
+let continuousSpeechTime = 0;
+let continuousSpeechLeniencyTime = 0;
+
+function doSpeechEvent(speechTime) {
+  const orbSize = scale(
+    speechTime,
+    MIN_SPEECH_TIME_FOR_EVENT,
+    MAX_SPEECH_TIME_FOR_EVENT,
+    MIN_ORB_SIZE,
+    MAX_ORB_SIZE
+  );
+  spawnOrb(orbSize);
+  NAF.connection.broadcastData("utterance", orbSize);
+}
 
 function speechTick() {
   const playerInfo = APP.componentRegistry["player-info"][0];
@@ -122,20 +146,23 @@ function speechTick() {
   const localAudioAnalyser = window.APP.scene.systems["local-audio-analyser"];
   const speaking = !muted && localAudioAnalyser.volume > MIC_PRESENCE_VOLUME_THRESHOLD;
   if (speaking) {
-    ticksOfContinuousSpeech += 1;
-    continuousSpeechLeniencyTicks = CONTINUOUS_SPEECH_LENIENCY_TICKS;
+    continuousSpeechTime += SPEECH_TIME_PER_TICK;
+    continuousSpeechLeniencyTime = CONTINUOUS_SPEECH_LENIENCY_TIME;
+    // if this is a single really long speech event, break it off and start a new one
+    if (continuousSpeechTime >= MAX_SPEECH_TIME_FOR_EVENT) {
+      doSpeechEvent(continuousSpeechTime);
+      continuousSpeechTime = 0;
+    }
   }
   else {
-    if (continuousSpeechLeniencyTicks > 0) {
-      continuousSpeechLeniencyTicks -= 1;
+    if (continuousSpeechLeniencyTime > 0) {
+      continuousSpeechLeniencyTime -= SPEECH_TIME_PER_TICK;
     }
-    if (continuousSpeechLeniencyTicks <= 0
-        && ticksOfContinuousSpeech >= MIN_SPEECH_TICKS_FOR_EVENT) {
+    if (continuousSpeechLeniencyTime <= 0
+        && continuousSpeechTime >= MIN_SPEECH_TIME_FOR_EVENT) {
       // speech event ended
-      const orbSize = ticksOfContinuousSpeech * 0.005;
-      spawnOrb(orbSize);
-      NAF.connection.broadcastData("utterance", orbSize);
-      ticksOfContinuousSpeech = 0;
+      doSpeechEvent(continuousSpeechTime);
+      continuousSpeechTime = 0;
     }
   }
 }
