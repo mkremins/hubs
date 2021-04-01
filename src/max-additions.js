@@ -84,9 +84,14 @@ function initMaxAdditions(scene) {
 }
 
 
+function sessionIDToColor(sessionID) {
+  return "#" + sessionID.substring(0,6); // just use first 6 chars lol
+}
+
+
 function handleUtterance(senderId, dataType, data, targetId) {
   console.log(senderId, dataType, data, targetId);
-  spawnOrb(data, "red");
+  spawnOrb(data.size, sessionIDToColor(data.speaker));
 }
 
 
@@ -136,8 +141,9 @@ function doSpeechEvent(speechTime) {
     MIN_ORB_SIZE,
     MAX_ORB_SIZE
   );
-  spawnOrb(orbSize);
-  NAF.connection.broadcastData("utterance", orbSize);
+  const speaker = APP.componentRegistry["player-info"][0].playerSessionId;
+  spawnOrb(orbSize, sessionIDToColor(speaker));
+  NAF.connection.broadcastData("utterance", {size: orbSize, speaker: speaker});
 }
 
 function speechTick() {
