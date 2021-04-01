@@ -10,3 +10,5 @@ export class App {
     this.mediaDevicesManager = null;
   }
 }
+
+// Test
