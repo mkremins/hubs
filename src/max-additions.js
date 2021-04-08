@@ -81,6 +81,34 @@ function initMaxAdditions(scene) {
     wall.setAttribute("shape-helper", {type: SHAPE.BOX});
     APP.scene.appendChild(wall);
   }
+
+  // give unhatted avatars hats
+  // FIXME: don't poll for this, do it once on new user entry event
+  setInterval(function() {
+    for (let playerInfo of APP.componentRegistry["player-info"]) {
+      spawnHat(playerInfo);
+    }
+  }, 1000);
+}
+
+
+function spawnHat(playerInfo) {
+  // bail out early if hat already present
+  const avatar = playerInfo.el;
+  if (avatar.querySelector(".hat")) return;
+
+  // create, color, position, and scale the hat
+  const hat = document.createElement("a-entity");
+  hat.classList.add("hat");
+  hat.setAttribute("geometry", "primitive:cylinder;radius:0.15;height:0.1");
+  const color = sessionIDToColor(playerInfo.playerSessionId);
+  hat.setAttribute("material", `color:${color};shader:flat`);
+  hat.setAttribute("position", "0 1.8 0");
+
+  // add the hat to the avatar
+  avatar.appendChild(hat);
+
+  return hat;
 }
 
 
