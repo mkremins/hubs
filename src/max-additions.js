@@ -38,7 +38,10 @@ const ORB_CONTAINER_DEPTH = 4;
 
 const MIN_ORB_SIZE = 0.05;
 const MAX_ORB_SIZE = 0.9;
-const SPEECH_ORB_LIFETIME = 1000 * 30;
+const SPEECH_ORB_LIFETIME = 1000 * 60 * 5; // 5mins realtime
+const ORB_GROWTH_PER_TICK =
+  (MAX_ORB_SIZE - MIN_ORB_SIZE) /
+  ((MAX_SPEECH_TIME_FOR_EVENT - MIN_SPEECH_TIME_FOR_EVENT) / SPEECH_TIME_PER_TICK);
 
 /// main code
 
@@ -49,12 +52,14 @@ function initMaxAdditions(scene) {
   clearInterval(interval);
   console.log("!!!initMaxAdditions!!!");
 
-  // when we receive an utterance from another client, call handleUtterance
-  NAF.connection.subscribeToDataChannel("utterance", handleUtterance);
+  // when we receive a speech event from another client, call the appropriate handler
+  NAF.connection.subscribeToDataChannel("startSpeech", startSpeech);
+  NAF.connection.subscribeToDataChannel("stopSpeech", stopSpeech);
 
   // periodically poll for voice input to spawn utterances for this client
   setInterval(speechTick, SPEECH_TIME_PER_TICK);
 
+  /*
   // spawn orb container
   const radius = ORB_CONTAINER_SIZE;
   const center = ORB_CONTAINER_POS;
@@ -81,6 +86,7 @@ function initMaxAdditions(scene) {
     wall.setAttribute("shape-helper", {type: SHAPE.BOX});
     APP.scene.appendChild(wall);
   }
+  */
 
   // give unhatted avatars hats
   // FIXME: don't poll for this, do it once on new user entry event
@@ -93,6 +99,9 @@ function initMaxAdditions(scene) {
 
 
 function spawnHat(playerInfo) {
+  // bail out early if session ID not yet assigned
+  if (!playerInfo.playerSessionId) return;
+
   // bail out early if hat already present
   const avatar = playerInfo.el;
   if (avatar.querySelector(".hat")) return;
@@ -116,10 +125,45 @@ function sessionIDToColor(sessionID) {
   return "#" + sessionID.substring(0,6); // just use first 6 chars lol
 }
 
+function getPlayerInfo(sessionID) {
+  const playerInfos = APP.componentRegistry["player-info"];
+  return playerInfos.find(pi => pi.playerSessionId === sessionID);
+}
 
-function handleUtterance(senderId, dataType, data, targetId) {
-  console.log(senderId, dataType, data, targetId);
-  spawnOrb(data.size, sessionIDToColor(data.speaker));
+
+let activeSpeechOrbs = {};
+
+function startSpeech(senderId, dataType, data, targetId) {
+  console.log("startSpeech", senderId, dataType, data, targetId);
+  const activeOrb = activeSpeechOrbs[data.speaker];
+  if (activeOrb) {
+    activeOrb.classList.add("finished"); // FIXME replace w/ stopSpeech call for consistency?
+  }
+  const playerInfo = getPlayerInfo(data.speaker);
+  const newOrb = spawnOrb(MIN_ORB_SIZE, sessionIDToColor(data.speaker));
+  activeSpeechOrbs[data.speaker] = newOrb;
+
+  // position the orb relative to the player and the center of the scene
+  const centerObj = document.querySelector(".Table");
+  const centerPos = centerObj
+    ? centerObj.object3D.position.clone()
+    : new THREE.Vector3(...ORB_CONTAINER_POS);
+  centerPos.y = 3;
+  const playerPos = playerInfo.el.object3D.position.clone();
+  playerPos.y = 3;
+  const offset = new THREE.Vector3().subVectors(playerPos, centerPos).normalize();
+  const orbPos = new THREE.Vector3().addVectors(centerPos, offset);
+  newOrb.setAttribute("position", orbPos);
+}
+
+function stopSpeech(senderId, dataType, data, targetId) {
+  console.log("stopSpeech", senderId, dataType, data, targetId);
+  const activeOrb = activeSpeechOrbs[data.speaker];
+  if (activeOrb) {
+    activeOrb.setAttribute("geometry", `primitive:sphere;radius:${data.size}`);
+    activeOrb.classList.add("finished");
+    delete activeSpeechOrbs[data.speaker];
+  }
 }
 
 
@@ -127,25 +171,22 @@ function spawnOrb(size, color) {
   color = color || "yellow";
   console.log("spawnOrb", size, color);
 
-  /*
-  // get the avatar position for orb placement
-  const playerInfo = APP.componentRegistry["player-info"][0];
-  const avatar = playerInfo.el.object3D;
-  */
-
   // create, color, position, and scale the orb
-  const pos = ORB_CONTAINER_POS;
+  //const pos = ORB_CONTAINER_POS;
   const orb = document.createElement("a-entity");
+  orb.classList.add("speechOrb");
   orb.setAttribute("geometry", `primitive:sphere;radius:${size}`);
   orb.setAttribute("material", `color:${color};shader:flat`);
-  orb.setAttribute("position", `${pos[0]} ${pos[1] + 5} ${pos[2]}`);
+  //orb.setAttribute("position", `${pos[0]} ${pos[1] + 5} ${pos[2]}`);
 
+  /*
   // add physics and a collider
   orb.setAttribute("body-helper", {
     collisionFilterMask: COLLISION_LAYERS.ALL,
     gravity: {x: 0, y: -9.8, z: 0}
   });
   orb.setAttribute("shape-helper", {type: SHAPE.SPHERE});
+  */
 
   // add the orb to the scene
   APP.scene.appendChild(orb);
@@ -161,7 +202,7 @@ function spawnOrb(size, color) {
 let continuousSpeechTime = 0;
 let continuousSpeechLeniencyTime = 0;
 
-function doSpeechEvent(speechTime) {
+function doStopSpeech(speechTime) {
   const orbSize = scale(
     speechTime,
     MIN_SPEECH_TIME_FOR_EVENT,
@@ -170,8 +211,9 @@ function doSpeechEvent(speechTime) {
     MAX_ORB_SIZE
   );
   const speaker = APP.componentRegistry["player-info"][0].playerSessionId;
-  spawnOrb(orbSize, sessionIDToColor(speaker));
-  NAF.connection.broadcastData("utterance", {size: orbSize, speaker: speaker});
+  const eventData = {size: orbSize, speaker: speaker};
+  stopSpeech(null, null, eventData); // local
+  NAF.connection.broadcastData("stopSpeech", eventData); // networked
 }
 
 function speechTick() {
@@ -179,12 +221,20 @@ function speechTick() {
   const muted = playerInfo.data.muted;
   const localAudioAnalyser = window.APP.scene.systems["local-audio-analyser"];
   const speaking = !muted && localAudioAnalyser.volume > MIC_PRESENCE_VOLUME_THRESHOLD;
+
+  // maintain speech event state of local user, send events as needed
   if (speaking) {
+    if (continuousSpeechTime === 0) {
+      // speech event started
+      const eventData = {speaker: playerInfo.playerSessionId};
+      startSpeech(null, null, eventData); // local
+      NAF.connection.broadcastData("startSpeech", eventData); // networked
+    }
     continuousSpeechTime += SPEECH_TIME_PER_TICK;
     continuousSpeechLeniencyTime = CONTINUOUS_SPEECH_LENIENCY_TIME;
     // if this is a single really long speech event, break it off and start a new one
     if (continuousSpeechTime >= MAX_SPEECH_TIME_FOR_EVENT) {
-      doSpeechEvent(continuousSpeechTime);
+      doStopSpeech(continuousSpeechTime);
       continuousSpeechTime = 0;
     }
   }
@@ -195,8 +245,19 @@ function speechTick() {
     if (continuousSpeechLeniencyTime <= 0
         && continuousSpeechTime >= MIN_SPEECH_TIME_FOR_EVENT) {
       // speech event ended
-      doSpeechEvent(continuousSpeechTime);
+      doStopSpeech(continuousSpeechTime);
       continuousSpeechTime = 0;
     }
+  }
+
+  // update speech orb sizes and positions
+  for (let finishedOrb of document.querySelectorAll(".speechOrb.finished")) {
+    const pos = finishedOrb.getAttribute("position");
+    pos.y += 0.001;
+    finishedOrb.setAttribute("position", pos);
+  }
+  for (let activeOrb of Object.values(activeSpeechOrbs)) {
+    const size = activeOrb.getAttribute("geometry").radius + ORB_GROWTH_PER_TICK;
+    activeOrb.setAttribute("geometry", `primitive:sphere;radius:${size}`);
   }
 }
