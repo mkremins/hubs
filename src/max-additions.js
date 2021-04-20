@@ -102,20 +102,21 @@ function spawnHat(playerInfo) {
   // bail out early if session ID not yet assigned
   if (!playerInfo.playerSessionId) return;
 
-  // bail out early if hat already present
+  // bail out early if avatar not yet loaded, or hat already present
   const avatar = playerInfo.el;
+  if (!avatar.querySelector(".Spine")) return;
   if (avatar.querySelector(".hat")) return;
 
   // create, color, position, and scale the hat
   const hat = document.createElement("a-entity");
   hat.classList.add("hat");
-  hat.setAttribute("geometry", "primitive:cylinder;radius:0.15;height:0.1");
+  hat.setAttribute("geometry", "primitive:cylinder;radius:0.16;height:0.25");
   const color = sessionIDToColor(playerInfo.playerSessionId);
   hat.setAttribute("material", `color:${color};shader:flat`);
-  hat.setAttribute("position", "0 1.8 0");
+  hat.setAttribute("position", "0 0 0");
 
   // add the hat to the avatar
-  avatar.appendChild(hat);
+  avatar.querySelector(".Spine").appendChild(hat);
 
   return hat;
 }
