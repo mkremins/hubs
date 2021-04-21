@@ -7,7 +7,7 @@ AFRAME.registerComponent("floaty-object", {
     autoLockOnLoad: { default: false },
 
     // Make the object kinematic immediately upon release
-    autoLockOnRelease: { default: false },
+    autoLockOnRelease: { default: true }, // was false -max
 
     // On release, modify the gravity based upon gravitySpeedLimit. If less than this, let the object float
     // otherwise apply releaseGravity.
@@ -20,7 +20,7 @@ AFRAME.registerComponent("floaty-object", {
     reduceAngularFloat: { default: false },
 
     // Velocity speed limit under which gravity will not be added if modifyGravityOnRelease is true
-    gravitySpeedLimit: { default: 1.85 } // Set to 0 to never apply gravity
+    gravitySpeedLimit: { default: 0 } // Set to 0 to never apply gravity // was 1.85 -max
   },
 
   init() {

@@ -32,6 +32,7 @@ import { MediaFramesSystem } from "./media-frames";
 import { InspectYourselfSystem } from "./inspect-yourself-system";
 import { DataVisualizationSystem } from "./datavisualization-system";
 import "../max-additions";
+import "../george-additions";
 
 AFRAME.registerSystem("hubs-systems", {
   init() {

@@ -95,6 +95,14 @@ function initMaxAdditions(scene) {
       spawnHat(playerInfo);
     }
   }, 1000);
+
+  // disable multiple spawn on all super-spawners
+  const spawners = document.querySelectorAll("[super-spawner].interactable");
+  const cooldown = 1000 * 60 * 60 * 24 * 7; // one week is probably enough
+  spawners.forEach(function(spawner) {
+    console.log("disabling multiple spawn:", spawner);
+    spawner.components["super-spawner"].data.spawnCooldown = cooldown;
+  });
 }
 
 
