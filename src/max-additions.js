@@ -169,7 +169,7 @@ function stopSpeech(senderId, dataType, data, targetId) {
   console.log("stopSpeech", senderId, dataType, data, targetId);
   const activeOrb = activeSpeechOrbs[data.speaker];
   if (activeOrb) {
-    activeOrb.setAttribute("geometry", `primitive:sphere;radius:${data.size}`);
+    activeOrb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${data.size}`);
     activeOrb.classList.add("finished");
     delete activeSpeechOrbs[data.speaker];
   }
@@ -184,7 +184,7 @@ function spawnOrb(size, color) {
   //const pos = ORB_CONTAINER_POS;
   const orb = document.createElement("a-entity");
   orb.classList.add("speechOrb");
-  orb.setAttribute("geometry", `primitive:sphere;radius:${size}`);
+  orb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${size}`);
   orb.setAttribute("material", `color:${color};shader:flat`);
   //orb.setAttribute("position", `${pos[0]} ${pos[1] + 5} ${pos[2]}`);
 
@@ -266,7 +266,7 @@ function speechTick() {
     finishedOrb.setAttribute("position", pos);
   }
   for (let activeOrb of Object.values(activeSpeechOrbs)) {
-    const size = activeOrb.getAttribute("geometry").radius + ORB_GROWTH_PER_TICK;
-    activeOrb.setAttribute("geometry", `primitive:sphere;radius:${size}`);
+    const size = activeOrb.getAttribute("geometry").height + ORB_GROWTH_PER_TICK;
+    activeOrb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${size}`);
   }
 }
