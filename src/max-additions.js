@@ -126,6 +126,28 @@ function spawnHat(playerInfo) {
   // add the hat to the avatar
   avatar.querySelector(".Spine").appendChild(hat);
 
+  // add "gloves" if hands present
+  const leftHand = avatar.querySelector(".LeftHand");
+  if (leftHand) {
+    const leftGlove = document.createElement("a-entity");
+    leftGlove.classList.add("glove");
+    leftGlove.classList.add("leftGlove");
+    leftGlove.setAttribute("geometry", "primitive:sphere;radius:0.1");
+    leftGlove.setAttribute("material", `color:${color};shader:flat`);
+    leftGlove.setAttribute("position", "0 0 0");
+    leftHand.appendChild(leftGlove);
+  }
+  const rightHand = avatar.querySelector(".RightHand");
+  if (rightHand) {
+    const rightGlove = document.createElement("a-entity");
+    rightGlove.classList.add("glove");
+    rightGlove.classList.add("rightGlove");
+    rightGlove.setAttribute("geometry", "primitive:sphere;radius:0.1");
+    rightGlove.setAttribute("material", `color:${color};shader:flat`);
+    rightGlove.setAttribute("position", "0 0 0");
+    rightHand.appendChild(rightGlove);
+  }
+
   return hat;
 }
 
