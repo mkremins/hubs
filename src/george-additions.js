@@ -1,88 +1,102 @@
-// Useful Links
-// https://github.com/mozilla/hubs/blob/f7a74cab8ba6babdbe188d7755ce46764fc1bac3/doc/creating-networked-interactables.md#creating-new-networked-interactables
-
-import { COLLISION_LAYERS } from "./constants";
-import { SHAPE, TYPE } from "three-ammo/constants";
-
 console.log("[ George's Module Loaded ]");
-
-// Utility
-
-function createElement(htmlString) {
-  const div = document.createElement("div");
-  div.innerHTML = htmlString.trim();
-
-  return div.firstChild;
-}
 
 // Config
 
 const BARGE_TICKRATE = 10;
 const BARGE_SPEED = 1;
 const BARGE_STARTING_POS = [10, 5, 5];
+const BARGE_X_SIZE = 2;
+const BARGE_Z_SIZE = 4;
 
 // Main
 
 let interval = null;
 let barge = null;
-const doMove = true;
+let doMove = false;
 
 function bargeTick() {
   if (!barge) {
     return;
   }
 
-  // Make a button to toggle this?
   if (doMove) {
-    let currentPos = barge.getAttribute("position");
-    currentPos = { x: currentPos.x, y: currentPos.y + 0.001 * BARGE_SPEED, z: currentPos.z };
+    const currentPos = barge.getAttribute("position");
 
-    barge.setAttribute("position", currentPos);
-    //console.log(barge.getAttribute("position"));
+    barge.setAttribute("position", {
+      x: currentPos.x + 0.001 * BARGE_SPEED,
+      y: currentPos.y,
+      z: currentPos.z
+    });
+
+    // get X/Z bounds of barge
+    const bargeMinX = currentPos.x - (BARGE_X_SIZE / 2);
+    const bargeMaxX = currentPos.x + (BARGE_X_SIZE / 2);
+    const bargeMinZ = currentPos.z - (BARGE_Z_SIZE / 2);
+    const bargeMaxZ = currentPos.z + (BARGE_Z_SIZE / 2);
+
+    // check if local user's avatar inside barge X/Z column; move it along with the barge if so
+    const avatar = APP.componentRegistry["player-info"][0].el;
+    const pos = avatar.getAttribute("position");
+    if (pos.x >= bargeMinX && pos.x <= bargeMaxX && pos.z >= bargeMinZ && pos.z <= bargeMaxZ) {
+      pos.x += 0.001 * BARGE_SPEED;
+      avatar.setAttribute("position", pos);
+    }
   }
 }
 
-function init(scene) {
+function spawnBarge() {
+  if (!barge) {
+    barge = document.createElement("a-entity");
+    barge.setAttribute("position", BARGE_STARTING_POS);
+    barge.setAttribute("geometry", {
+      primitive: "box",
+      width: BARGE_X_SIZE,
+      height: 1,
+      depth: BARGE_Z_SIZE
+    });
+    barge.setAttribute("material", {
+      color: "white",
+      shader: "flat"
+    });
+
+    setInterval(bargeTick, BARGE_TICKRATE);
+    // eslint-disable-next-line no-undef
+    APP.scene.appendChild(barge);
+  }
+}
+
+function startBarge() {
+  if (!barge) {
+    return;
+  }
+
+  doMove = true;
+}
+
+function stopBarge() {
+  if (!barge) {
+    return;
+  }
+
+  doMove = false;
+}
+
+function init() {
   if (!window.APP || !window.APP.scene) {
     return;
   }
 
-  console.log("[ George's Module Initializing ]");
   clearInterval(interval);
+  console.log("[ George's Module Initializing ]");
 
-  setInterval(bargeTick, BARGE_TICKRATE);
-  barge = document.createElement("a-entity");
+  spawnBarge();
 
-  // Need to make sure this networks properly.
-  // I think it won't sync fully until it gets added to hubs.html? Still investigating.
+  NAF.connection.subscribeToDataChannel("startBarge", startBarge);
+  NAF.connection.subscribeToDataChannel("stopBarge", stopBarge);
 
-  barge.setAttribute("geometry", {
-    primitive: "box",
-    width: 2,
-    height: 1,
-    depth: 4
-  });
-
-  barge.setAttribute("material", { color: "white" });
-  barge.setAttribute("position", BARGE_STARTING_POS);
-  barge.setAttribute("body-helper", {
-    type: TYPE.DYNAMIC,
-    mass: 1,
-    collisionFilterGroup: COLLISION_LAYERS.INTERACTABLES,
-    collisionFilterMask: COLLISION_LAYERS.DEFAULT_INTERACTABLE
-  });
-  barge.setAttribute("shape-helper", {
-    type: SHAPE.BOX
-  });
-  barge.setAttribute("set-unowned-body-kinematic", "");
-  barge.setAttribute("floaty-object", {
-    modifyGravityOnRelease: false,
-    autoLockOnLoad: true,
-    gravitySpeedLimit: 0,
-    reduceAngularFloat: true
-  });
-
-  APP.scene.appendChild(barge);
+  // make these fns available from the console. FIXME shouldn't need this outside of testing?
+  window.startBarge = startBarge;
+  window.stopBarge = stopBarge;
 }
 
 interval = setInterval(init, 10);
