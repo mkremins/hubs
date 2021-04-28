@@ -94,6 +94,14 @@ function initMaxAdditions(scene) {
       spawnHat(playerInfo);
     }
   }, 1000);
+
+  // disable multiple spawn on all super-spawners
+  const spawners = document.querySelectorAll("[super-spawner].interactable");
+  const cooldown = 1000 * 60 * 60 * 24 * 7; // one week is probably enough
+  spawners.forEach(function(spawner) {
+    console.log("disabling multiple spawn:", spawner);
+    spawner.components["super-spawner"].data.spawnCooldown = cooldown;
+  });
 }
 
 function spawnHat(playerInfo) {
@@ -115,6 +123,28 @@ function spawnHat(playerInfo) {
 
   // add the hat to the avatar
   avatar.querySelector(".Spine").appendChild(hat);
+
+  // add "gloves" if hands present
+  const leftHand = avatar.querySelector(".LeftHand");
+  if (leftHand) {
+    const leftGlove = document.createElement("a-entity");
+    leftGlove.classList.add("glove");
+    leftGlove.classList.add("leftGlove");
+    leftGlove.setAttribute("geometry", "primitive:sphere;radius:0.1");
+    leftGlove.setAttribute("material", `color:${color};shader:flat`);
+    leftGlove.setAttribute("position", "0 0 0");
+    leftHand.appendChild(leftGlove);
+  }
+  const rightHand = avatar.querySelector(".RightHand");
+  if (rightHand) {
+    const rightGlove = document.createElement("a-entity");
+    rightGlove.classList.add("glove");
+    rightGlove.classList.add("rightGlove");
+    rightGlove.setAttribute("geometry", "primitive:sphere;radius:0.1");
+    rightGlove.setAttribute("material", `color:${color};shader:flat`);
+    rightGlove.setAttribute("position", "0 0 0");
+    rightHand.appendChild(rightGlove);
+  }
 
   return hat;
 }
@@ -155,7 +185,7 @@ function stopSpeech(senderId, dataType, data, targetId) {
   console.log("stopSpeech", senderId, dataType, data, targetId);
   const activeOrb = activeSpeechOrbs[data.speaker];
   if (activeOrb) {
-    activeOrb.setAttribute("geometry", `primitive:sphere;radius:${data.size}`);
+    activeOrb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${data.size}`);
     activeOrb.classList.add("finished");
     delete activeSpeechOrbs[data.speaker];
   }
@@ -169,7 +199,7 @@ function spawnOrb(size, color) {
   //const pos = ORB_CONTAINER_POS;
   const orb = document.createElement("a-entity");
   orb.classList.add("speechOrb");
-  orb.setAttribute("geometry", `primitive:sphere;radius:${size}`);
+  orb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${size}`);
   orb.setAttribute("material", `color:${color};shader:flat`);
   //orb.setAttribute("position", `${pos[0]} ${pos[1] + 5} ${pos[2]}`);
 
@@ -241,8 +271,8 @@ function speechTick() {
     pos.y += 0.001;
     finishedOrb.setAttribute("position", pos);
   }
-  for (const activeOrb of Object.values(activeSpeechOrbs)) {
-    const size = activeOrb.getAttribute("geometry").radius + ORB_GROWTH_PER_TICK;
-    activeOrb.setAttribute("geometry", `primitive:sphere;radius:${size}`);
+  for (let activeOrb of Object.values(activeSpeechOrbs)) {
+    const size = activeOrb.getAttribute("geometry").height + ORB_GROWTH_PER_TICK;
+    activeOrb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${size}`);
   }
 }
