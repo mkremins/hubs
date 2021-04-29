@@ -118,7 +118,7 @@ function spawnHat(playerInfo) {
   // create, color, position, and scale the hat
   const hat = document.createElement("a-entity");
   hat.classList.add("hat");
-  hat.setAttribute("geometry", "primitive:cylinder;radius:0.16;height:0.25");
+  hat.setAttribute("geometry", "primitive:cylinder;segmentsHeight:1;radius:0.16;height:0.25");
   const color = sessionIDToColor(playerInfo.playerSessionId);
   hat.setAttribute("material", `color:${color};shader:flat`);
   hat.setAttribute("position", "0 0 0");
@@ -191,7 +191,13 @@ function stopSpeech(senderId, dataType, data, targetId) {
   console.log("stopSpeech", senderId, dataType, data, targetId);
   const activeOrb = activeSpeechOrbs[data.speaker];
   if (activeOrb) {
-    activeOrb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${data.size}`);
+    activeOrb.setAttribute("geometry", {
+      primitive: "cylinder",
+      segmentsHeight: 1,
+      segmentsRadial: 6,
+      radius: 0.1,
+      height: data.size
+    });
     activeOrb.classList.add("finished");
     delete activeSpeechOrbs[data.speaker];
   }
@@ -206,7 +212,13 @@ function spawnOrb(size, color) {
   //const pos = ORB_CONTAINER_POS;
   const orb = document.createElement("a-entity");
   orb.classList.add("speechOrb");
-  orb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${size}`);
+  orb.setAttribute("geometry", {
+    primitive: "cylinder",
+    segmentsHeight: 1,
+    segmentsRadial: 6,
+    radius: 0.1,
+    height: size
+  });
   orb.setAttribute("material", `color:${color};shader:flat`);
   //orb.setAttribute("position", `${pos[0]} ${pos[1] + 5} ${pos[2]}`);
 
@@ -289,6 +301,12 @@ function speechTick() {
   }
   for (let activeOrb of Object.values(activeSpeechOrbs)) {
     const size = activeOrb.getAttribute("geometry").height + ORB_GROWTH_PER_TICK;
-    activeOrb.setAttribute("geometry", `primitive:cylinder;radius:0.1;height:${size}`);
+    activeOrb.setAttribute("geometry", {
+      primitive: "cylinder",
+      segmentsHeight: 1,
+      segmentsRadial: 6,
+      radius: 0.1,
+      height: size
+    });
   }
 }
