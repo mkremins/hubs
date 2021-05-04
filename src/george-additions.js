@@ -29,12 +29,13 @@ function bargeTick() {
     });
 
     // get X/Z bounds of barge
-    const bargeMinX = currentPos.x - (BARGE_X_SIZE / 2);
-    const bargeMaxX = currentPos.x + (BARGE_X_SIZE / 2);
-    const bargeMinZ = currentPos.z - (BARGE_Z_SIZE / 2);
-    const bargeMaxZ = currentPos.z + (BARGE_Z_SIZE / 2);
+    const bargeMinX = currentPos.x - BARGE_X_SIZE / 2;
+    const bargeMaxX = currentPos.x + BARGE_X_SIZE / 2;
+    const bargeMinZ = currentPos.z - BARGE_Z_SIZE / 2;
+    const bargeMaxZ = currentPos.z + BARGE_Z_SIZE / 2;
 
     // check if local user's avatar inside barge X/Z column; move it along with the barge if so
+    // eslint-disable-next-line no-undef
     const avatar = APP.componentRegistry["player-info"][0].el;
     const pos = avatar.getAttribute("position");
     if (pos.x >= bargeMinX && pos.x <= bargeMaxX && pos.z >= bargeMinZ && pos.z <= bargeMaxZ) {
@@ -62,11 +63,14 @@ function spawnBarge() {
     setInterval(bargeTick, BARGE_TICKRATE);
     // eslint-disable-next-line no-undef
     APP.scene.appendChild(barge);
+  } else {
+    console.log("Cannot Create: Barge already exists.");
   }
 }
 
 function startBarge() {
   if (!barge) {
+    console.warn("Cannot Start: Barge is non-existant.");
     return;
   }
 
@@ -75,6 +79,7 @@ function startBarge() {
 
 function stopBarge() {
   if (!barge) {
+    console.warn("Cannot Stop: Barge is non-existant.");
     return;
   }
 
