@@ -3,10 +3,10 @@ console.log("[ George's Module Loaded ]");
 // Config
 
 const BARGE_TICKRATE = 10;
-const BARGE_SPEED = 1;
 const BARGE_STARTING_POS = [10, 5, 5];
 const BARGE_X_SIZE = 2;
 const BARGE_Z_SIZE = 4;
+const BARGE_SPEED = 1;
 
 // Main
 
@@ -38,6 +38,7 @@ function bargeTick() {
     // eslint-disable-next-line no-undef
     const avatar = APP.componentRegistry["player-info"][0].el;
     const pos = avatar.getAttribute("position");
+
     if (pos.x >= bargeMinX && pos.x <= bargeMaxX && pos.z >= bargeMinZ && pos.z <= bargeMaxZ) {
       pos.x += 0.001 * BARGE_SPEED;
       avatar.setAttribute("position", pos);
@@ -68,22 +69,38 @@ function spawnBarge() {
   }
 }
 
-function startBarge() {
+function startBarge(senderId, dataType, data, targetId) {
+  console.log("startBarge", senderId, dataType, data, targetId);
+
+  doMove = true;
+}
+
+function stopBarge(senderId, dataType, data, targetId) {
+  console.log("stopBarge", senderId, dataType, data, targetId);
+
+  doMove = false;
+}
+
+function doStartBarge() {
   if (!barge) {
     console.warn("Cannot Start: Barge is non-existant.");
     return;
   }
 
-  doMove = true;
+  const eventData = { startedAt: barge.getAttribute("position") };
+  startBarge(null, null, eventData); // local
+  NAF.connection.broadcastData("startBarge", eventData); // networked
 }
 
-function stopBarge() {
+function doStopBarge() {
   if (!barge) {
     console.warn("Cannot Stop: Barge is non-existant.");
     return;
   }
 
-  doMove = false;
+  const eventData = { stoppedAt: barge.getAttribute("position") };
+  stopBarge(null, null, eventData); // local
+  NAF.connection.broadcastData("startBarge", eventData); // networked
 }
 
 function init() {
@@ -100,8 +117,8 @@ function init() {
   NAF.connection.subscribeToDataChannel("stopBarge", stopBarge);
 
   // make these fns available from the console. FIXME shouldn't need this outside of testing?
-  window.startBarge = startBarge;
-  window.stopBarge = stopBarge;
+  window.startBarge = doStartBarge;
+  window.stopBarge = doStopBarge;
 }
 
 interval = setInterval(init, 10);
