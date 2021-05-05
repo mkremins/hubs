@@ -6,7 +6,7 @@ const BARGE_TICKRATE = 10;
 const BARGE_STARTING_POS = [10, 5, 5];
 const BARGE_X_SIZE = 2;
 const BARGE_Z_SIZE = 4;
-const BARGE_SPEED = 1;
+let BARGE_SPEED = 1;
 
 // Main
 
@@ -81,6 +81,12 @@ function stopBarge(senderId, dataType, data, targetId) {
   doMove = false;
 }
 
+function setBargeSpeed(senderId, dataType, data, targetId) {
+  console.log("setBargeSpeed", senderId, dataType, data, targetId);
+
+  BARGE_SPEED = data.speed;
+}
+
 function doStartBarge() {
   if (!barge) {
     console.warn("Cannot Start: Barge is non-existant.");
@@ -103,6 +109,25 @@ function doStopBarge() {
   NAF.connection.broadcastData("startBarge", eventData); // networked
 }
 
+function doSetBargeSpeed(amount) {
+  if (barge) {
+    const s = parseFloat(amount);
+
+    if (isNaN(s)) {
+      console.warn("Cannot Change Speed: Desired Speed is NaN.");
+      return;
+    } else {
+      const eventData = { speed: s };
+
+      setBargeSpeed(null, null, eventData); // local
+      NAF.connection.broadcastData("setBargeSpeed", eventData); // networked
+    }
+  } else {
+    console.warn("Cannot Change Speed: Barge is non-existant.");
+    return;
+  }
+}
+
 function init() {
   if (!window.APP || !window.APP.scene) {
     return;
@@ -115,10 +140,12 @@ function init() {
 
   NAF.connection.subscribeToDataChannel("startBarge", startBarge);
   NAF.connection.subscribeToDataChannel("stopBarge", stopBarge);
+  NAF.connection.subscribeToDataChannel("setBargeSpeed", setBargeSpeed);
 
   // make these fns available from the console. FIXME shouldn't need this outside of testing?
   window.startBarge = doStartBarge;
   window.stopBarge = doStopBarge;
+  window.setBargeSpeed = doSetBargeSpeed;
 }
 
 interval = setInterval(init, 10);
