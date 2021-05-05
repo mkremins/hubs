@@ -110,21 +110,21 @@ function doStopBarge() {
 }
 
 function doSetBargeSpeed(amount) {
-  const s = parseFloat(amount);
+  if (barge) {
+    const s = parseFloat(amount);
 
-  if (!barge) {
+    if (isNaN(s)) {
+      console.warn("Cannot Change Speed: Desired Speed is NaN.");
+      return;
+    } else {
+      const eventData = { speed: s };
+
+      setBargeSpeed(null, null, eventData); // local
+      NAF.connection.broadcastData("setBargeSpeed", eventData); // networked
+    }
+  } else {
     console.warn("Cannot Change Speed: Barge is non-existant.");
     return;
-  }
-
-  if (isNaN(s)) {
-    console.warn("Cannot Change Speed: Desired Speed is NaN.");
-    return;
-  } else {
-    const eventData = { speed: s };
-
-    setBargeSpeed(null, null, eventData); // local
-    NAF.connection.broadcastData("setBargeSpeed", eventData); // networked
   }
 }
 
