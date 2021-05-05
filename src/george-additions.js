@@ -123,7 +123,7 @@ function doSetBargeSpeed(amount) {
   } else {
     const eventData = { speed: s };
 
-    stopBarge(null, null, eventData); // local
+    setBargeSpeed(null, null, eventData); // local
     NAF.connection.broadcastData("setBargeSpeed", eventData); // networked
   }
 }
