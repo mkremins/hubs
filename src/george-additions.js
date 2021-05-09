@@ -1,151 +1,55 @@
-console.log("[ George's Module Loaded ]");
+AFRAME.registerComponent("socialvr-barge", {
+  schema: {
+    width: { type: "number", default: 3 },
+    height: { type: "number", default: 1 },
+    depth: { type: "number", default: 4 },
+    speed: { type: "number", default: 1 },
+    moving: { type: "boolean", default: false }
+  },
 
-// Config
+  init() {
+    const data = this.data;
+    const el = this.el;
 
-const BARGE_TICKRATE = 10;
-const BARGE_STARTING_POS = [10, 5, 5];
-const BARGE_X_SIZE = 2;
-const BARGE_Z_SIZE = 4;
-let BARGE_SPEED = 1;
+    this.geometry = new THREE.BoxBufferGeometry(data.width, data.height, data.depth);
+    this.material = new THREE.MeshStandardMaterial({ color: "#AAA" });
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    el.setObject3D("mesh", this.mesh);
 
-// Main
+    window.startBarge = this.startBarge.bind(this);
+    window.stopBarge = this.stopBarge.bind(this);
+  },
 
-let interval = null;
-let barge = null;
-let doMove = false;
+  remove: function() {
+    this.el.removeObject3D("mesh");
+  },
 
-function bargeTick() {
-  if (!barge) {
-    return;
-  }
+  tick(time, timeDelta) {
+    if (this.data.moving) {
+      const currentPosition = this.el.object3D.position;
+      const factor = this.data.speed;
 
-  if (doMove) {
-    const currentPos = barge.getAttribute("position");
-
-    barge.setAttribute("position", {
-      x: currentPos.x + 0.001 * BARGE_SPEED,
-      y: currentPos.y,
-      z: currentPos.z
-    });
-
-    // get X/Z bounds of barge
-    const bargeMinX = currentPos.x - BARGE_X_SIZE / 2;
-    const bargeMaxX = currentPos.x + BARGE_X_SIZE / 2;
-    const bargeMinZ = currentPos.z - BARGE_Z_SIZE / 2;
-    const bargeMaxZ = currentPos.z + BARGE_Z_SIZE / 2;
-
-    // check if local user's avatar inside barge X/Z column; move it along with the barge if so
-    // eslint-disable-next-line no-undef
-    const avatar = APP.componentRegistry["player-info"][0].el;
-    const pos = avatar.getAttribute("position");
-
-    if (pos.x >= bargeMinX && pos.x <= bargeMaxX && pos.z >= bargeMinZ && pos.z <= bargeMaxZ) {
-      pos.x += 0.001 * BARGE_SPEED;
-      avatar.setAttribute("position", pos);
+      this.el.setAttribute("position", {
+        x: currentPosition.x + factor * (timeDelta / 1000),
+        y: currentPosition.y,
+        z: currentPosition.z
+      });
     }
+  },
+
+  startBarge() {
+    this.data.moving = true;
+  },
+
+  stopBarge() {
+    this.data.moving = false;
   }
-}
+});
 
-function spawnBarge() {
-  if (!barge) {
-    barge = document.createElement("a-entity");
-    barge.setAttribute("position", BARGE_STARTING_POS);
-    barge.setAttribute("geometry", {
-      primitive: "box",
-      width: BARGE_X_SIZE,
-      height: 1,
-      depth: BARGE_Z_SIZE
-    });
-    barge.setAttribute("material", {
-      color: "white",
-      shader: "flat"
-    });
+document.addEventListener("DOMContentLoaded", () => {
+  const sceneEl = document.querySelector("a-scene");
+  const entityEl = document.createElement("a-entity");
 
-    setInterval(bargeTick, BARGE_TICKRATE);
-    // eslint-disable-next-line no-undef
-    APP.scene.appendChild(barge);
-  } else {
-    console.log("Cannot Create: Barge already exists.");
-  }
-}
-
-function startBarge(senderId, dataType, data, targetId) {
-  console.log("startBarge", senderId, dataType, data, targetId);
-
-  doMove = true;
-}
-
-function stopBarge(senderId, dataType, data, targetId) {
-  console.log("stopBarge", senderId, dataType, data, targetId);
-
-  doMove = false;
-}
-
-function setBargeSpeed(senderId, dataType, data, targetId) {
-  console.log("setBargeSpeed", senderId, dataType, data, targetId);
-
-  BARGE_SPEED = data.speed;
-}
-
-function doStartBarge() {
-  if (!barge) {
-    console.warn("Cannot Start: Barge is non-existant.");
-    return;
-  }
-
-  const eventData = { startedAt: barge.getAttribute("position") };
-  startBarge(null, null, eventData); // local
-  NAF.connection.broadcastData("startBarge", eventData); // networked
-}
-
-function doStopBarge() {
-  if (!barge) {
-    console.warn("Cannot Stop: Barge is non-existant.");
-    return;
-  }
-
-  const eventData = { stoppedAt: barge.getAttribute("position") };
-  stopBarge(null, null, eventData); // local
-  NAF.connection.broadcastData("startBarge", eventData); // networked
-}
-
-function doSetBargeSpeed(amount) {
-  if (barge) {
-    const s = parseFloat(amount);
-
-    if (isNaN(s)) {
-      console.warn("Cannot Change Speed: Desired Speed is NaN.");
-      return;
-    } else {
-      const eventData = { speed: s };
-
-      setBargeSpeed(null, null, eventData); // local
-      NAF.connection.broadcastData("setBargeSpeed", eventData); // networked
-    }
-  } else {
-    console.warn("Cannot Change Speed: Barge is non-existant.");
-    return;
-  }
-}
-
-function init() {
-  if (!window.APP || !window.APP.scene) {
-    return;
-  }
-
-  clearInterval(interval);
-  console.log("[ George's Module Initializing ]");
-
-  spawnBarge();
-
-  NAF.connection.subscribeToDataChannel("startBarge", startBarge);
-  NAF.connection.subscribeToDataChannel("stopBarge", stopBarge);
-  NAF.connection.subscribeToDataChannel("setBargeSpeed", setBargeSpeed);
-
-  // make these fns available from the console. FIXME shouldn't need this outside of testing?
-  window.startBarge = doStartBarge;
-  window.stopBarge = doStopBarge;
-  window.setBargeSpeed = doSetBargeSpeed;
-}
-
-interval = setInterval(init, 10);
+  entityEl.setAttribute("socialvr-barge", "");
+  sceneEl.appendChild(entityEl);
+});
