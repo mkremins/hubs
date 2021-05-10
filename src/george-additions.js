@@ -1,3 +1,27 @@
+AFRAME.registerSystem("socialvr-barge", {
+  init() {
+    this.barge = null;
+  },
+
+  registerBarge(ent) {
+    if (this.barge != null) {
+      this.barge.remove();
+    }
+
+    this.barge = ent;
+    setInterval(() => {
+      this.barge.startBarge();
+      setInterval(() => {
+        this.barge.stopBarge();
+      }, 5000);
+    }, 10000);
+  },
+
+  unregisterBarge() {
+    this.barge = null;
+  }
+});
+
 AFRAME.registerComponent("socialvr-barge", {
   schema: {
     width: { type: "number", default: 3 },
@@ -8,20 +32,23 @@ AFRAME.registerComponent("socialvr-barge", {
   },
 
   init() {
-    const data = this.data;
-    const el = this.el;
-
-    this.geometry = new THREE.BoxBufferGeometry(data.width, data.height, data.depth);
+    // Mesh
+    this.geometry = new THREE.BoxBufferGeometry(this.data.width, this.data.height, this.data.depth);
     this.material = new THREE.MeshStandardMaterial({ color: "#AAA" });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
-    el.setObject3D("mesh", this.mesh);
 
-    window.startBarge = this.startBarge.bind(this);
-    window.stopBarge = this.stopBarge.bind(this);
+    this.el.setObject3D("mesh", this.mesh);
+    this.el.setAttribute("networked", "template:#barge-drawing;attachTemplateToLocal:false;");
+    this.system.registerBarge(this);
+
+    console.log("\n\n\n\n\n\n\n");
+    console.log(this.system);
+    console.log("\n\n\n\n\n\n\n");
   },
 
-  remove: function() {
+  remove() {
     this.el.removeObject3D("mesh");
+    this.system.unregisterBarge();
   },
 
   tick(time, timeDelta) {
@@ -46,7 +73,30 @@ AFRAME.registerComponent("socialvr-barge", {
   }
 });
 
+function createElement(htmlString) {
+  const div = document.createElement("div");
+  div.innerHTML = htmlString.trim();
+
+  return div.firstChild;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Create template
+  const assetsEl = document.querySelector("a-assets");
+  const bargeTemplate = createElement(`
+    <template id="barge-drawing">
+      <a-entity socialvr-barge></a-entity>
+    </template>
+  `);
+
+  assetsEl.appendChild(bargeTemplate);
+
+  NAF.schemas.add({
+    template: "#barge-drawing",
+    components: ["socialvr-barge"]
+  });
+
+  // Create entity
   const sceneEl = document.querySelector("a-scene");
   const entityEl = document.createElement("a-entity");
 
