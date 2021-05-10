@@ -9,22 +9,30 @@ AFRAME.registerSystem("socialvr-barge", {
     }
 
     this.barge = ent;
-    setInterval(() => {
-      this.barge.startBarge();
-      setInterval(() => {
-        this.barge.stopBarge();
-      }, 5000);
-    }, 10000);
+
+    // Networking
+    NAF.connection.subscribeToDataChannel("startBarge", this.barge.startBarge);
+    NAF.connection.subscribeToDataChannel("stopBarge", this.barge.stopBarge);
+    NAF.connection.subscribeToDataChannel("resetBarge", this.barge.resetBarge);
+
+    // Util
+    window.startBarge = this.barge.startBarge.bind(this.barge);
+    window.stopBarge = this.barge.stopBarge.bind(this.barge);
+    window.resetBarge = this.barge.resetBarge.bind(this.barge);
   },
 
   unregisterBarge() {
     this.barge = null;
+
+    NAF.connection.unsubscribeToDataChannel("startBarge");
+    NAF.connection.unsubscribeToDataChannel("stopBarge");
+    NAF.connection.unsubscribeToDataChannel("resetBarge");
   }
 });
 
 AFRAME.registerComponent("socialvr-barge", {
   schema: {
-    width: { type: "number", default: 3 },
+    width: { type: "number", default: 4 },
     height: { type: "number", default: 1 },
     depth: { type: "number", default: 4 },
     speed: { type: "number", default: 1 },
@@ -38,12 +46,7 @@ AFRAME.registerComponent("socialvr-barge", {
     this.mesh = new THREE.Mesh(this.geometry, this.material);
 
     this.el.setObject3D("mesh", this.mesh);
-    this.el.setAttribute("networked", "template:#barge-drawing;attachTemplateToLocal:false;");
     this.system.registerBarge(this);
-
-    console.log("\n\n\n\n\n\n\n");
-    console.log(this.system);
-    console.log("\n\n\n\n\n\n\n");
   },
 
   remove() {
@@ -54,49 +57,71 @@ AFRAME.registerComponent("socialvr-barge", {
   tick(time, timeDelta) {
     if (this.data.moving) {
       const currentPosition = this.el.object3D.position;
-      const factor = this.data.speed;
 
+      // Move the barge.
       this.el.setAttribute("position", {
-        x: currentPosition.x + factor * (timeDelta / 1000),
+        x: currentPosition.x + (this.data.speed / 1000) * timeDelta,
         y: currentPosition.y,
         z: currentPosition.z
       });
+
+      // Move avatar with the barge.
+      const bargeMinX = currentPosition.x - this.data.width / 2;
+      const bargeMaxX = currentPosition.x + this.data.width / 2;
+      const bargeMinZ = currentPosition.z - this.data.depth / 2;
+      const bargeMaxZ = currentPosition.z + this.data.depth / 2;
+
+      const avatar = window.APP.componentRegistry["player-info"][0].el;
+      const avatarPosition = avatar.getAttribute("position");
+
+      if (
+        avatarPosition.x >= bargeMinX &&
+        avatarPosition.x <= bargeMaxX &&
+        avatarPosition.z >= bargeMinZ &&
+        avatarPosition.z <= bargeMaxZ
+      ) {
+        avatarPosition.x = avatarPosition.x + (this.data.speed / 1000) * timeDelta;
+        avatar.setAttribute("position", avatarPosition);
+      }
     }
   },
 
   startBarge() {
-    this.data.moving = true;
+    console.log("Barge - Starting");
+
+    this._startBarge(null, null, {});
+    NAF.connection.broadcastData("startBarge", {});
   },
 
   stopBarge() {
+    console.log("Barge - Stopping");
+
+    this._stopBarge(null, null, {});
+    NAF.connection.broadcastData("stopBarge", {});
+  },
+
+  resetBarge() {
+    console.log("Barge - Resetting");
+
+    this._resetBarge(null, null, {});
+    NAF.connection.broadcastData("resetBarge", {});
+  },
+
+  _startBarge(senderId, dataType, data, targetId) {
+    this.data.moving = true;
+  },
+
+  _stopBarge(senderId, dataType, data, targetId) {
     this.data.moving = false;
+  },
+
+  _resetBarge(senderId, dataType, data, targetId) {
+    this.data.moving = false;
+    this.el.setAttribute("position", { x: 0, y: 0, z: 0 });
   }
 });
 
-function createElement(htmlString) {
-  const div = document.createElement("div");
-  div.innerHTML = htmlString.trim();
-
-  return div.firstChild;
-}
-
 document.addEventListener("DOMContentLoaded", () => {
-  // Create template
-  const assetsEl = document.querySelector("a-assets");
-  const bargeTemplate = createElement(`
-    <template id="barge-drawing">
-      <a-entity socialvr-barge></a-entity>
-    </template>
-  `);
-
-  assetsEl.appendChild(bargeTemplate);
-
-  NAF.schemas.add({
-    template: "#barge-drawing",
-    components: ["socialvr-barge"]
-  });
-
-  // Create entity
   const sceneEl = document.querySelector("a-scene");
   const entityEl = document.createElement("a-entity");
 
