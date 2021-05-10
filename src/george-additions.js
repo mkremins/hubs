@@ -11,9 +11,9 @@ AFRAME.registerSystem("socialvr-barge", {
     this.barge = ent;
 
     // Networking
-    NAF.connection.subscribeToDataChannel("startBarge", this.barge.startBarge);
-    NAF.connection.subscribeToDataChannel("stopBarge", this.barge.stopBarge);
-    NAF.connection.subscribeToDataChannel("resetBarge", this.barge.resetBarge);
+    NAF.connection.subscribeToDataChannel("startBarge", this.barge._startBarge);
+    NAF.connection.subscribeToDataChannel("stopBarge", this.barge._stopBarge);
+    NAF.connection.subscribeToDataChannel("resetBarge", this.barge._resetBarge);
 
     // Util
     window.startBarge = this.barge.startBarge.bind(this.barge);
