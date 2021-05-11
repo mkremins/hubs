@@ -1,3 +1,7 @@
+import { SOUND_QUACK } from "./systems/sound-effects-system";
+import { TYPE } from "three-ammo/constants";
+const COLLISION_LAYERS = require("./constants").COLLISION_LAYERS;
+
 AFRAME.registerSystem("socialvr-barge", {
   init() {
     this.barge = null;
@@ -9,6 +13,7 @@ AFRAME.registerSystem("socialvr-barge", {
     }
 
     this.barge = ent;
+    ent.el.emit("bargeregistered", { bargeEnt: ent });
 
     // Networking
     NAF.connection.subscribeToDataChannel("startBarge", this.barge._startBarge);
@@ -30,21 +35,7 @@ AFRAME.registerSystem("socialvr-barge", {
   }
 });
 
-AFRAME.registerComponent("socialvr-barge-button-go", {
-  init() {
-    this.geometry = new THREE.BoxBufferGeometry(1, 1, 1);
-    this.material = new THREE.MeshStandardMaterial({ color: "#27AE60" });
-    this.mesh = new THREE.Mesh(this.geometry, this.material);
-
-    this.el.setObject3D("mesh", this.mesh);
-    this.el.classList.add("interactable");
-  },
-
-  remove: function() {
-    this.el.removeObject3D("mesh");
-  }
-});
-
+// Barge Component
 AFRAME.registerComponent("socialvr-barge", {
   schema: {
     width: { type: "number", default: 4 },
@@ -139,10 +130,58 @@ AFRAME.registerComponent("socialvr-barge", {
   }
 });
 
+// Go Button Component
+AFRAME.registerComponent("socialvr-barge-button-go", {
+  schema: {
+    barge: { default: null }
+  },
+
+  init() {
+    this.geometry = new THREE.BoxBufferGeometry(0.2, 0.2, 0.2);
+    this.material = new THREE.MeshStandardMaterial({ color: "#1A8748" });
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+
+    this.el.setObject3D("mesh", this.mesh);
+    this.el.addEventListener("click", function(evt) {
+      console.log("CLICKED!!!");
+      this.el.setAttribute("material", "color", "#FFF");
+      this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_QUACK);
+    });
+  },
+
+  remove: function() {
+    this.el.removeObject3D("mesh");
+  }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   const sceneEl = document.querySelector("a-scene");
-  const entityEl = document.createElement("a-entity");
+  const bargeEl = document.createElement("a-entity");
 
-  entityEl.setAttribute("socialvr-barge", "");
-  sceneEl.appendChild(entityEl);
+  bargeEl.setAttribute("socialvr-barge", "");
+  bargeEl.addEventListener("bargeregistered", function(event) {
+    // console.log("NEW ENT REGISTERED", event.detail.bargeEnt);
+    const buttonGoEl = document.createElement("a-entity");
+    const bargeEl = event.detail.bargeEnt.el;
+
+    buttonGoEl.setAttribute("socialvr-barge-button-go", "");
+    buttonGoEl.setAttribute("hoverable-visuals", "");
+    buttonGoEl.setAttribute("is-remote-hover-target", "");
+    buttonGoEl.setAttribute("css-class", "interactable");
+    buttonGoEl.setAttribute("body-helper", {
+      mass: 0,
+      type: TYPE.STATIC,
+      collisionFilterGroup: COLLISION_LAYERS.INTERACTABLES,
+      collisionFilterMask: COLLISION_LAYERS.DEFAULT_SPAWNER
+    });
+    buttonGoEl.setAttribute("position", {
+      x: bargeEl.object3D.position.x + (2 - 0.2),
+      y: bargeEl.object3D.position.y + 1,
+      z: bargeEl.object3D.position.z
+    });
+
+    document.querySelector('[socialvr-barge=""]').appendChild(buttonGoEl);
+  });
+
+  sceneEl.appendChild(bargeEl);
 });
