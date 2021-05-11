@@ -103,6 +103,9 @@ function initMaxAdditions(scene) {
     console.log("disabling multiple spawn:", spawner);
     spawner.components["super-spawner"].data.spawnCooldown = cooldown;
   });
+
+  // add a globally accessible event log to the window
+  window.eventLog = [];
 }
 
 
@@ -181,11 +184,18 @@ function getPlayerInfo(sessionID) {
   return playerInfos.find(pi => pi.playerSessionId === sessionID);
 }
 
+function logEvent(eventType, event) {
+  event.eventType = eventType;
+  event.timestamp = Date.now();
+  window.eventLog.push(event);
+}
+
 
 let activeSpeechOrbs = {};
 
 function startSpeech(senderId, dataType, data, targetId) {
   console.log("startSpeech", senderId, dataType, data, targetId);
+  logEvent("startSpeech", data);
   const activeOrb = activeSpeechOrbs[data.speaker];
   if (activeOrb) {
     activeOrb.classList.add("finished"); // FIXME replace w/ stopSpeech call for consistency?
@@ -209,6 +219,7 @@ function startSpeech(senderId, dataType, data, targetId) {
 
 function stopSpeech(senderId, dataType, data, targetId) {
   console.log("stopSpeech", senderId, dataType, data, targetId);
+  logEvent("stopSpeech", data);
   const activeOrb = activeSpeechOrbs[data.speaker];
   if (activeOrb) {
     activeOrb.setAttribute("geometry", {
