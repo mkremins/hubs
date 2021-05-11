@@ -30,6 +30,21 @@ AFRAME.registerSystem("socialvr-barge", {
   }
 });
 
+AFRAME.registerComponent("socialvr-barge-button-go", {
+  init() {
+    this.geometry = new THREE.BoxBufferGeometry(1, 1, 1);
+    this.material = new THREE.MeshStandardMaterial({ color: "#27AE60" });
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+
+    this.el.setObject3D("mesh", this.mesh);
+    this.el.classList.add("interactable");
+  },
+
+  remove: function() {
+    this.el.removeObject3D("mesh");
+  }
+});
+
 AFRAME.registerComponent("socialvr-barge", {
   schema: {
     width: { type: "number", default: 4 },
@@ -107,14 +122,17 @@ AFRAME.registerComponent("socialvr-barge", {
     NAF.connection.broadcastData("resetBarge", {});
   },
 
+  // eslint-disable-next-line no-unused-vars
   _startBarge(senderId, dataType, data, targetId) {
     this.data.moving = true;
   },
 
+  // eslint-disable-next-line no-unused-vars
   _stopBarge(senderId, dataType, data, targetId) {
     this.data.moving = false;
   },
 
+  // eslint-disable-next-line no-unused-vars
   _resetBarge(senderId, dataType, data, targetId) {
     this.data.moving = false;
     this.el.setAttribute("position", { x: 0, y: 0, z: 0 });
