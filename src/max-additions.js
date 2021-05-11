@@ -119,7 +119,7 @@ function spawnHat(playerInfo) {
   const hat = document.createElement("a-entity");
   hat.classList.add("hat");
   hat.setAttribute("geometry", "primitive:cylinder;segmentsHeight:1;radius:0.16;height:0.25");
-  const color = sessionIDToColor(playerInfo.playerSessionId);
+  const color = playerInfoToColor(playerInfo);
   hat.setAttribute("material", `color:${color};shader:flat`);
   hat.setAttribute("position", "0 0 0");
 
@@ -156,6 +156,26 @@ function sessionIDToColor(sessionID) {
   return "#" + sessionID.substring(0,6); // just use first 6 chars lol
 }
 
+function playerInfoToColor(playerInfo) {
+  // keys are "Avatar listing sid"s from Approved Avatars admin tab
+  const colorsByAvatar = {
+    "WUvZgGK": "lightskyblue",
+    "qpOOt9I": "hotpink",
+    "2s2UuzN": "red",
+    "wAUg76e": "limegreen",
+    "RczWQgy": "#222",
+    "xb4PVBE": "yellow",
+    "yw4c83R": "purple",
+    "4r1KpVk": "orange",
+    "bs7pLac": "darkblue"
+  };
+  const avatarURL = playerInfo.data.avatarSrc;
+  for (const avatarSID of Object.keys(colorsByAvatar)) {
+    if (avatarURL.includes(avatarSID)) return colorsByAvatar[avatarSID];
+  }
+  return sessionIDToColor(playerInfo.playerSessionId);
+}
+
 function getPlayerInfo(sessionID) {
   const playerInfos = APP.componentRegistry["player-info"];
   return playerInfos.find(pi => pi.playerSessionId === sessionID);
@@ -171,7 +191,7 @@ function startSpeech(senderId, dataType, data, targetId) {
     activeOrb.classList.add("finished"); // FIXME replace w/ stopSpeech call for consistency?
   }
   const playerInfo = getPlayerInfo(data.speaker);
-  const newOrb = spawnOrb(MIN_ORB_SIZE, sessionIDToColor(data.speaker));
+  const newOrb = spawnOrb(MIN_ORB_SIZE, playerInfoToColor(playerInfo));
   activeSpeechOrbs[data.speaker] = newOrb;
 
   // position the orb relative to the player and the center of the scene
