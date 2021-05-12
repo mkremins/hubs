@@ -13,11 +13,6 @@ AFRAME.registerSystem("socialvr-barge", {
     this.barge = ent;
     ent.el.emit("bargeregistered", { bargeEnt: ent });
 
-    // Networking
-    NAF.connection.subscribeToDataChannel("startBarge", this.barge._startBarge);
-    NAF.connection.subscribeToDataChannel("stopBarge", this.barge._stopBarge);
-    NAF.connection.subscribeToDataChannel("resetBarge", this.barge._resetBarge);
-
     // Util
     //window.startBarge = this.barge.startBarge.bind(this.barge);
     //window.stopBarge = this.barge.stopBarge.bind(this.barge);
@@ -26,10 +21,6 @@ AFRAME.registerSystem("socialvr-barge", {
 
   unregisterBarge() {
     this.barge = null;
-
-    NAF.connection.unsubscribeToDataChannel("startBarge");
-    NAF.connection.unsubscribeToDataChannel("stopBarge");
-    NAF.connection.unsubscribeToDataChannel("resetBarge");
   }
 });
 
@@ -51,6 +42,12 @@ AFRAME.registerComponent("socialvr-barge", {
 
     this.el.setObject3D("mesh", this.mesh);
     this.el.addEventListener("startBargeEvent", this.startBarge.bind(this));
+    this.el.addEventListener("stopBargeEvent", this.stopBarge.bind(this));
+    this.el.addEventListener("resetBargeEvent", this.resetBarge.bind(this));
+
+    NAF.connection.subscribeToDataChannel("startBarge", this._startBarge.bind(this));
+    NAF.connection.subscribeToDataChannel("stopBarge", this._stopBarge.bind(this));
+    NAF.connection.subscribeToDataChannel("resetBarge", this._resetBarge.bind(this));
 
     this.system.registerBarge(this);
   },
@@ -130,12 +127,21 @@ AFRAME.registerComponent("socialvr-barge", {
   }
 });
 
-// Go Button Component
-AFRAME.registerComponent("socialvr-barge-button-go", {
-  schema: {
-    barge: { type: "selector", default: "a-entity[socialvr-barge]" }
+// Reset Button Component
+AFRAME.registerComponent("socialvr-barge-button-reset", {
+  init() {
+    this.onClick = this.onClick.bind(this);
+    this.el.object3D.addEventListener("interact", this.onClick);
   },
 
+  onClick: function() {
+    this.el.emit("resetBargeEvent");
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+  }
+});
+
+// Go Button Component
+AFRAME.registerComponent("socialvr-barge-button-go", {
   init() {
     this.onClick = this.onClick.bind(this);
     this.el.object3D.addEventListener("interact", this.onClick);
@@ -143,6 +149,19 @@ AFRAME.registerComponent("socialvr-barge-button-go", {
 
   onClick: function() {
     this.el.emit("startBargeEvent");
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+  }
+});
+
+// Stop Button Component
+AFRAME.registerComponent("socialvr-barge-button-stop", {
+  init() {
+    this.onClick = this.onClick.bind(this);
+    this.el.object3D.addEventListener("interact", this.onClick);
+  },
+
+  onClick: function() {
+    this.el.emit("stopBargeEvent");
     this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
   }
 });
@@ -155,18 +174,55 @@ document.addEventListener("DOMContentLoaded", () => {
   bargeEl.addEventListener("bargeregistered", function(event) {
     // console.log("NEW ENT REGISTERED", event.detail.bargeEnt);
     const bargeEl = event.detail.bargeEnt.el;
-    const buttonGoEl = document.createElement("a-box");
-    const buttonGoElText = document.createElement("a-entity");
 
+    /** 
+    // Reset Button
+    */
+    const buttonResetEl = document.createElement("a-sphere");
+    const buttonResetTextEl = document.createElement("a-entity");
+
+    buttonResetEl.setAttribute("radius", "0.15");
+    buttonResetEl.setAttribute("material", "color: #3B56DC");
+    buttonResetEl.setAttribute("socialvr-barge-button-reset", "");
+    buttonResetEl.setAttribute("is-remote-hover-target", "");
+    buttonResetEl.setAttribute("tags", "singleActionButton: true");
+    buttonResetEl.setAttribute("css-class", "interactable");
+    /**
+    buttonResetEl.setAttribute("animation", {
+      property: "rotation",
+      to: "0, 360, 0",
+      easing: "linear",
+      loop: true,
+      dur: 10000
+    });
+    */
+    buttonResetEl.setAttribute("position", {
+      x: bargeEl.object3D.position.x + (2 - 0.2),
+      y: bargeEl.object3D.position.y + 1,
+      z: bargeEl.object3D.position.z // Center
+    });
+
+    // Go Button - Text
+    buttonResetTextEl.setAttribute("text", "value: RESET; align: center;");
+    buttonResetTextEl.setAttribute("rotation", "0 270 0");
+    buttonResetTextEl.setAttribute("position", "0 0.2 0");
+
+    buttonResetEl.appendChild(buttonResetTextEl);
+    bargeEl.appendChild(buttonResetEl);
+
+    /** 
     // Go Button
-    buttonGoEl.setAttribute("width", "0.2");
-    buttonGoEl.setAttribute("height", "0.2");
-    buttonGoEl.setAttribute("depth", "0.2");
-    buttonGoEl.setAttribute("material", "color: #27AE60");
+    */
+    const buttonGoEl = document.createElement("a-sphere");
+    const buttonGoTextEl = document.createElement("a-entity");
+
+    buttonGoEl.setAttribute("radius", "0.15");
+    buttonGoEl.setAttribute("material", "color: #32CD32");
     buttonGoEl.setAttribute("socialvr-barge-button-go", "");
     buttonGoEl.setAttribute("is-remote-hover-target", "");
     buttonGoEl.setAttribute("tags", "singleActionButton: true");
     buttonGoEl.setAttribute("css-class", "interactable");
+    /**
     buttonGoEl.setAttribute("animation", {
       property: "rotation",
       to: "0, 360, 0",
@@ -174,23 +230,55 @@ document.addEventListener("DOMContentLoaded", () => {
       loop: true,
       dur: 10000
     });
+    */
     buttonGoEl.setAttribute("position", {
       x: bargeEl.object3D.position.x + (2 - 0.2),
       y: bargeEl.object3D.position.y + 1,
-      z: bargeEl.object3D.position.z
+      z: bargeEl.object3D.position.z + 1 // Right
     });
 
-    // Text
-    buttonGoElText.setAttribute("text", "value: GO; align: center;");
-    buttonGoElText.setAttribute("rotation", "0 180 0");
-    buttonGoElText.setAttribute("position", "0 0.2 0");
+    // Go Button - Text
+    buttonGoTextEl.setAttribute("text", "value: GO; align: center;");
+    buttonGoTextEl.setAttribute("rotation", "0 270 0");
+    buttonGoTextEl.setAttribute("position", "0 0.2 0");
 
-    buttonGoEl.appendChild(buttonGoElText);
+    buttonGoEl.appendChild(buttonGoTextEl);
     bargeEl.appendChild(buttonGoEl);
 
-    // Bind functions after parenting
-    buttonGoElText.setAttribute("barge", "0 0.2 0");
-    buttonGoEl.setAttribute("barge", event.detail.bargeEnt);
+    /** 
+    // Stop Button
+    */
+    const buttonStopEl = document.createElement("a-sphere");
+    const buttonStopTextEl = document.createElement("a-entity");
+
+    buttonStopEl.setAttribute("radius", "0.15");
+    buttonStopEl.setAttribute("material", "color: #FF0000");
+    buttonStopEl.setAttribute("socialvr-barge-button-stop", "");
+    buttonStopEl.setAttribute("is-remote-hover-target", "");
+    buttonStopEl.setAttribute("tags", "singleActionButton: true");
+    buttonStopEl.setAttribute("css-class", "interactable");
+    /**
+        buttonStopEl.setAttribute("animation", {
+          property: "rotation",
+          to: "0, 360, 0",
+          easing: "linear",
+          loop: true,
+          dur: 10000
+        });
+        */
+    buttonStopEl.setAttribute("position", {
+      x: bargeEl.object3D.position.x + (2 - 0.2),
+      y: bargeEl.object3D.position.y + 1,
+      z: bargeEl.object3D.position.z - 1 // Left
+    });
+
+    // Stop Button - Text
+    buttonStopTextEl.setAttribute("text", "value: STOP; align: center;");
+    buttonStopTextEl.setAttribute("rotation", "0 270 0");
+    buttonStopTextEl.setAttribute("position", "0 0.2 0");
+
+    buttonStopEl.appendChild(buttonStopTextEl);
+    bargeEl.appendChild(buttonStopEl);
   });
 
   sceneEl.appendChild(bargeEl);
