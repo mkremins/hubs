@@ -284,8 +284,12 @@ function doStopSpeech(speechTime) {
     MIN_ORB_SIZE,
     MAX_ORB_SIZE
   );
-  const speaker = APP.componentRegistry["player-info"][0].playerSessionId;
-  const eventData = {size: orbSize, speaker: speaker};
+  const playerInfo = APP.componentRegistry["player-info"][0];
+  const eventData = {
+    size: orbSize,
+    speaker: playerInfo.playerSessionId,
+    speakerName: playerInfo.displayName
+  };
   stopSpeech(null, null, eventData); // local
   NAF.connection.broadcastData("stopSpeech", eventData); // networked
 }
@@ -300,7 +304,7 @@ function speechTick() {
   if (speaking) {
     if (continuousSpeechTime === 0) {
       // speech event started
-      const eventData = {speaker: playerInfo.playerSessionId};
+      const eventData = {speaker: playerInfo.playerSessionId, speakerName: playerInfo.displayName};
       startSpeech(null, null, eventData); // local
       NAF.connection.broadcastData("startSpeech", eventData); // networked
     }
