@@ -106,6 +106,9 @@ function initMaxAdditions(scene) {
 
   // add a globally accessible event log to the window
   window.eventLog = [];
+
+  // and a function for the moderator to log DST item positions
+  window.logItemPositions = logItemPositions;
 }
 
 
@@ -344,4 +347,52 @@ function speechTick() {
       height: size
     });
   }
+}
+
+/// log item positions
+
+function makeCells() {
+  const table = document.querySelector(".Table");
+  const tablePos = table.object3D.position;
+  const cells = [];
+  const rowSize = 0.2;
+  const colSize = 0.2;
+  for (let row = 2; row >= 0; row--) {
+    for (let col = 0; col < 5; col++) {
+      const cellNum = cells.length;
+      const rowOffset = row - 1;
+      const colOffset = col - 2;
+      cells.push({
+        x: tablePos.x + (rowOffset * rowSize),
+        z: tablePos.z + (colOffset * colSize),
+        cellNum
+      });
+    }
+  }
+  return cells;
+}
+
+function getClosestCell(pos) {
+  const cells = makeCells();
+  cells.sort((a, b) => {
+    const aPos = new THREE.Vector3(a.x, 0, a.z);
+    const bPos = new THREE.Vector3(b.x, 0, b.z);
+    return pos.distanceToSquared(aPos) - pos.distanceToSquared(bPos);
+  });
+  return cells[0];
+}
+
+function logItemPositions() {
+  const eventData = {itemRanks: {}};
+  // get DST items, ie objects spawned from super-spawners(?)
+  const uiInteractables = [...document.querySelectorAll(".interactable > .ui.interactable-ui")];
+  const items = uiInteractables.map(el => el.parentNode);
+  for (let i = 0; i < items.length; i++) {
+    // FIXME use something better than the spawn order (index) for keys in itemRanks
+    // (ideally a unique name per DST item)
+    const item = items[i];
+    const cellNum = getClosestCell(item.object3D.position);
+    eventData.itemRanks[i] = cellNum;
+  }
+  logEvent("itemPositions", eventData);
 }
