@@ -43,6 +43,12 @@ const ORB_GROWTH_PER_TICK =
   (MAX_ORB_SIZE - MIN_ORB_SIZE) /
   ((MAX_SPEECH_TIME_FOR_EVENT - MIN_SPEECH_TIME_FOR_EVENT) / SPEECH_TIME_PER_TICK);
 
+const DST_ITEM_NAMES = [
+  "book", "jacket", "pills", "canteen",
+  "flashlight", "compass", "knife", "mirror",
+  "newspaper", "bottle", "medic", "map"
+];
+
 /// main code
 
 const interval = setInterval(initMaxAdditions, 10);
@@ -96,13 +102,33 @@ function initMaxAdditions(scene) {
     }
   }, 1000);
 
-  // disable multiple spawn on all super-spawners
-  const spawners = document.querySelectorAll("[super-spawner].interactable");
-  const cooldown = 1000 * 60 * 60 * 24 * 7; // one week is probably enough
-  spawners.forEach(function(spawner) {
-    console.log("disabling multiple spawn:", spawner);
-    spawner.components["super-spawner"].data.spawnCooldown = cooldown;
-  });
+  // suppress visibility of all DST spawners until a moderater calls beginDST()
+  const suppressDSTInterval = setInterval(function() {
+    const dstSpawners = DST_ITEM_NAMES.map(name => document.querySelector(`.${name}`));
+    const cooldown = 1000 * 60 * 60 * 24 * 7; // one week is probably enough
+    for (const spawner of dstSpawners) {
+      // bail out early if no spawner found for this item name
+      if (!spawner) continue;
+      // first disable multiple spawn, while we're here
+      spawner.components["super-spawner"].data.spawnCooldown = cooldown;
+      // then disable visibility
+      spawner.setAttribute("visible", false);
+    }
+  }, 1000);
+  function enableDSTSpawners() {
+    console.log("beginDST");
+    clearInterval(suppressDSTInterval);
+    const dstSpawners = DST_ITEM_NAMES.map(name => document.querySelector(`.${name}`));
+    for (const spawner of dstSpawners) {
+      if (!spawner) continue;
+      spawner.setAttribute("visible", true);
+    }
+  }
+  window.beginDST = function() {
+    enableDSTSpawners();
+    NAF.connection.broadcastData("beginDST", {});
+  };
+  NAF.connection.subscribeToDataChannel("beginDST", enableDSTSpawners);
 
   // add a globally accessible event log to the window
   window.eventLog = [];
@@ -351,6 +377,17 @@ function speechTick() {
 
 /// log item positions
 
+function makeItemNameTable() {
+  const itemNamesByModelURL = {};
+  for (const itemName of DST_ITEM_NAMES) {
+    const dstSpawner = document.querySelector(`.${itemName}`);
+    const modelURL = dstSpawner.components["gltf-model-plus"].data.src;
+    itemNamesByModelURL[modelURL] = itemName;
+  }
+  return itemNamesByModelURL;
+}
+
+/*
 function makeCells() {
   const table = document.querySelector(".Table");
   const tablePos = table.object3D.position;
@@ -371,6 +408,25 @@ function makeCells() {
   }
   return cells;
 }
+*/
+
+function makeCells() {
+  // hardcoded based on DSTTable scene
+  return [
+    {x: 0, z: 0.65, cellNum: 1},
+    {x: 0, z: 0.5, cellNum: 2},
+    {x: 0, z: 0.4, cellNum: 3},
+    {x: 0, z: 0.275, cellNum: 4},
+    {x: 0, z: 0.15, cellNum: 5},
+    {x: 0, z: 0.025, cellNum: 6},
+    {x: 0, z: -0.1, cellNum: 7},
+    {x: 0, z: -0.225, cellNum: 8},
+    {x: 0, z: -0.35, cellNum: 9},
+    {x: 0, z: -0.475, cellNum: 10},
+    {x: 0, z: -0.6, cellNum: 11},
+    {x: 0, z: -0.725, cellNum: 12},
+  ];
+}
 
 function getClosestCell(pos) {
   const cells = makeCells();
@@ -383,16 +439,21 @@ function getClosestCell(pos) {
 }
 
 function logItemPositions() {
-  const eventData = {itemRanks: {}};
-  // get DST items, ie objects spawned from super-spawners(?)
+  const eventData = {itemRanks: {}, itemPositions: {}};
+  const itemNameTable = makeItemNameTable();
+  // get potential DST items, i.e., objects spawned from super-spawners
   const uiInteractables = [...document.querySelectorAll(".interactable > .ui.interactable-ui")];
   const items = uiInteractables.map(el => el.parentNode);
-  for (let i = 0; i < items.length; i++) {
-    // FIXME use something better than the spawn order (index) for keys in itemRanks
-    // (ideally a unique name per DST item)
-    const item = items[i];
-    const cellNum = getClosestCell(item.object3D.position);
-    eventData.itemRanks[i] = cellNum;
+  for (const item of items) {
+    const itemModel = item.components["gltf-model-plus"];
+    if (!itemModel) continue;
+    const itemName = itemNameTable[itemModel.data.src];
+    if (!itemName) continue;
+    const itemPos = item.object3D.position;
+    const cell = getClosestCell(itemPos);
+    eventData.itemRanks[itemName] = cell.cellNum;
+    eventData.itemPositions[itemName] = {x: itemPos.x, z: itemPos.z};
   }
   logEvent("itemPositions", eventData);
+  return eventData;
 }
