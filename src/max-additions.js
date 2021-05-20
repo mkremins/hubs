@@ -107,11 +107,7 @@ function initMaxAdditions(scene) {
     const dstSpawners = DST_ITEM_NAMES.map(name => document.querySelector(`.${name}`));
     const cooldown = 1000 * 60 * 60 * 24 * 7; // one week is probably enough
     for (const spawner of dstSpawners) {
-      // bail out early if no spawner found for this item name
-      if (!spawner) continue;
-      // first disable multiple spawn, while we're here
-      spawner.components["super-spawner"].data.spawnCooldown = cooldown;
-      // then disable visibility
+      if (!spawner) continue; // bail out early if no spawner found for this item name
       spawner.setAttribute("visible", false);
     }
   }, 1000);
@@ -120,7 +116,7 @@ function initMaxAdditions(scene) {
   function disableSpawner(senderId, dataType, data, targetId) {
     console.log("disableSpawner", data);
     const spawner = document.querySelector(`.${data.itemName}`);
-    spawner.object3D.position.y = -10; // move it below the world so it can't be used again
+    spawner.setAttribute("visible", false);
   }
   NAF.connection.subscribeToDataChannel("disableSpawner", disableSpawner);
 
