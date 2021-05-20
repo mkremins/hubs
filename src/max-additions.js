@@ -32,7 +32,7 @@ const MIN_SPEECH_TIME_FOR_EVENT = 100; // 0.1s realtime
 const MAX_SPEECH_TIME_FOR_EVENT = 5000; // 5s realtime
 const CONTINUOUS_SPEECH_LENIENCY_TIME = 100; // 0.1s realtime
 
-const ORB_CONTAINER_POS = [7,0,2]; //[0,0,0]
+const ORB_CONTAINER_POS = [0,0,0]; //[7,0,2]
 const ORB_CONTAINER_SIZE = 1;
 const ORB_CONTAINER_DEPTH = 4;
 
