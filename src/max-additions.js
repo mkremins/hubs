@@ -413,18 +413,18 @@ function makeCells() {
 function makeCells() {
   // hardcoded based on DSTTable scene
   return [
-    {x: 0, z: 0.65, cellNum: 1},
-    {x: 0, z: 0.5, cellNum: 2},
-    {x: 0, z: 0.4, cellNum: 3},
-    {x: 0, z: 0.275, cellNum: 4},
-    {x: 0, z: 0.15, cellNum: 5},
-    {x: 0, z: 0.025, cellNum: 6},
-    {x: 0, z: -0.1, cellNum: 7},
-    {x: 0, z: -0.225, cellNum: 8},
-    {x: 0, z: -0.35, cellNum: 9},
-    {x: 0, z: -0.475, cellNum: 10},
-    {x: 0, z: -0.6, cellNum: 11},
-    {x: 0, z: -0.725, cellNum: 12},
+    {x: 0, z: -0.85, cellNum: 1},
+    {x: 0, z: -0.71, cellNum: 2},
+    {x: 0, z: -0.575, cellNum: 3},
+    {x: 0, z: -0.45, cellNum: 4},
+    {x: 0, z: -0.31, cellNum: 5},
+    {x: 0, z: -0.17, cellNum: 6},
+    {x: 0, z: -0.04, cellNum: 7},
+    {x: 0, z: 0.09, cellNum: 8},
+    {x: 0, z: 0.23, cellNum: 9},
+    {x: 0, z: 0.365, cellNum: 10},
+    {x: 0, z: 0.5, cellNum: 11},
+    {x: 0, z: 0.635, cellNum: 12},
   ];
 }
 
