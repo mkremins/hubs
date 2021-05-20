@@ -115,6 +115,16 @@ function initMaxAdditions(scene) {
       spawner.setAttribute("visible", false);
     }
   }, 1000);
+
+  // selectively re-disable spawners when they're used
+  function disableSpawner(senderId, dataType, data, targetId) {
+    console.log("disableSpawner", data);
+    const spawner = document.querySelector(`.${data.itemName}`);
+    spawner.object3D.position.y = -10; // move it below the world so it can't be used again
+  }
+  NAF.connection.subscribeToDataChannel("disableSpawner", disableSpawner);
+
+  // code to enable DST spawners
   function enableDSTSpawners() {
     console.log("beginDST");
     clearInterval(suppressDSTInterval);
@@ -122,6 +132,15 @@ function initMaxAdditions(scene) {
     for (const spawner of dstSpawners) {
       if (!spawner) continue;
       spawner.setAttribute("visible", true);
+
+      // attach a spawn event listener
+      spawner.addEventListener("spawned-entity-created", function() {
+        const itemName = spawner.classList[0];
+        console.log("spawned-entity-created", itemName);
+        const eventData = {itemName: itemName};
+        disableSpawner(null, null, eventData);
+        NAF.connection.broadcastData("disableSpawner", eventData);
+      });
     }
   }
   window.beginDST = function() {
