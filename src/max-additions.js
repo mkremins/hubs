@@ -117,6 +117,7 @@ function initMaxAdditions(scene) {
     console.log("disableSpawner", data);
     const spawner = document.querySelector(`.${data.itemName}`);
     spawner.setAttribute("visible", false);
+    spawner.object3D.position.y = -10; // do we have to hide it *both* ways? :(((
   }
   NAF.connection.subscribeToDataChannel("disableSpawner", disableSpawner);
 
