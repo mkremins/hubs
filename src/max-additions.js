@@ -23,6 +23,15 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min) + min); // max exclusive, min inclusive
 }
 
+function retryUntilTruthy(fn, retryFrequencyMS) {
+  const interval = setInterval(function() {
+    const retVal = fn();
+    if (retVal) {
+      clearInterval(interval);
+    }
+  }, retryFrequencyMS);
+}
+
 /// constants
 
 const MIC_PRESENCE_VOLUME_THRESHOLD = 0.00001;
@@ -57,6 +66,19 @@ function initMaxAdditions(scene) {
   if (!window.APP || !window.APP.scene) return;
   clearInterval(interval);
   console.log("!!!initMaxAdditions!!!");
+
+  // remove the barge from scenes where the barge isn't wanted
+  retryUntilTruthy(function() {
+    const sceneNameHolder = document.querySelector("#environment-scene > a-entity > a-entity");
+    if (!sceneNameHolder) return;
+    const sceneName = sceneNameHolder.className;
+    console.log("sceneName", sceneName);
+    if (sceneName === "DSTTable") {
+      console.log("Removing barge from scene due to sceneName:", sceneName);
+      document.querySelector("[socialvr-barge]").remove();
+    }
+    return true;
+  }, 100);
 
   // when we receive a speech event from another client, call the appropriate handler
   NAF.connection.subscribeToDataChannel("startSpeech", startSpeech);
