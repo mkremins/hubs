@@ -175,6 +175,12 @@ function initMaxAdditions(scene) {
 
   // and a function for the moderator to log DST item positions
   window.logItemPositions = logItemPositions;
+
+  // and a single "log everything" function
+  window.logEverything = function() {
+    logItemPositions();
+    return JSON.stringify(window.eventLog, null, 2);
+  }
 }
 
 
