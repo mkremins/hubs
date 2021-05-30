@@ -73,7 +73,7 @@ function initMaxAdditions(scene) {
     if (!sceneNameHolder) return;
     const sceneName = sceneNameHolder.className;
     console.log("sceneName", sceneName);
-    if (sceneName === "DSTTable") {
+    if (sceneName.includes("DSTTable")) {
       console.log("Removing barge from scene due to sceneName:", sceneName);
       document.querySelector("[socialvr-barge]").remove();
     }
