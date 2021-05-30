@@ -116,6 +116,7 @@ function initMaxAdditions(scene) {
   }
   */
 
+  /*
   // give unhatted avatars hats
   // FIXME: don't poll for this, do it once on new user entry event
   setInterval(function() {
@@ -123,6 +124,7 @@ function initMaxAdditions(scene) {
       spawnHat(playerInfo);
     }
   }, 1000);
+  */
 
   // suppress visibility of all DST spawners until a moderater calls beginDST()
   const suppressDSTInterval = setInterval(function() {
