@@ -1,4 +1,6 @@
-import { SOUND_PIN } from "./systems/sound-effects-system";
+import { SOUND_SPAWN_EMOJI } from "./systems/sound-effects-system";
+
+const targetPosition = new THREE.Vector3(50, 0, 0);
 
 AFRAME.registerSystem("socialvr-barge", {
   init() {
@@ -60,13 +62,24 @@ AFRAME.registerComponent("socialvr-barge", {
   tick(time, timeDelta) {
     if (this.data.moving) {
       const currentPosition = this.el.object3D.position;
+      const targetBargeNormalizedVector = new THREE.Vector3(0, 0, 0);
+
+      targetBargeNormalizedVector.x = targetPosition.x - currentPosition.x;
+      targetBargeNormalizedVector.y = targetPosition.y - currentPosition.y;
+      targetBargeNormalizedVector.z = targetPosition.z - currentPosition.z;
+      targetBargeNormalizedVector.normalize();
 
       // Move the barge.
+      this.el.object3D.translateOnAxis(targetBargeNormalizedVector, (this.data.speed / 1000) * timeDelta);
+      this.el.object3D.updateMatrix();
+
+      /** 
       this.el.setAttribute("position", {
         x: currentPosition.x + (this.data.speed / 1000) * timeDelta,
         y: currentPosition.y,
         z: currentPosition.z
       });
+      */
 
       // Move avatar with the barge.
       const bargeMinX = currentPosition.x - this.data.width / 2;
@@ -74,8 +87,15 @@ AFRAME.registerComponent("socialvr-barge", {
       const bargeMinZ = currentPosition.z - this.data.depth / 2;
       const bargeMaxZ = currentPosition.z + this.data.depth / 2;
 
+      //const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
       const avatar = window.APP.componentRegistry["player-info"][0].el;
       const avatarPosition = avatar.getAttribute("position");
+      const targetAvatarNormalizedVector = new THREE.Vector3(0, 0, 0);
+
+      targetAvatarNormalizedVector.x = currentPosition.x - avatarPosition.x;
+      targetAvatarNormalizedVector.y = currentPosition.y - avatarPosition.y;
+      targetAvatarNormalizedVector.z = currentPosition.z - avatarPosition.z;
+      targetAvatarNormalizedVector.normalize();
 
       if (
         avatarPosition.x >= bargeMinX &&
@@ -83,8 +103,8 @@ AFRAME.registerComponent("socialvr-barge", {
         avatarPosition.z >= bargeMinZ &&
         avatarPosition.z <= bargeMaxZ
       ) {
-        avatarPosition.x = avatarPosition.x + (this.data.speed / 1000) * timeDelta;
-        avatar.setAttribute("position", avatarPosition);
+        avatar.object3D.translateOnAxis(targetAvatarNormalizedVector, (this.data.speed / 1000) * timeDelta);
+        avatar.object3D.updateMatrix();
       }
     }
   },
@@ -103,6 +123,27 @@ AFRAME.registerComponent("socialvr-barge", {
   _resetBarge(senderId, dataType, data, targetId) {
     this.data.moving = false;
     this.el.setAttribute("position", { x: 0, y: 0, z: 0 });
+
+    /**
+     * Player Teleportation
+     * 
+    const avatar = window.APP.componentRegistry["player-info"][0].el;
+    const avatarPosition = avatar.getAttribute("position");
+    const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
+
+    if (
+      avatarPosition.x >= bargeMinX &&
+      avatarPosition.x <= bargeMaxX &&
+      avatarPosition.z >= bargeMinZ &&
+      avatarPosition.z <= bargeMaxZ
+    ) {
+      avatarPosition.x = avatarPosition.x + (this.data.speed / 1000) * timeDelta;
+      avatar.setAttribute("position", avatarPosition);
+    }
+
+    console.log(player.el.getAttribute("position"));
+    player.teleportTo(this.el.getAttribute("position"));
+    */
   },
 
   startBarge() {
@@ -136,7 +177,10 @@ AFRAME.registerComponent("socialvr-barge-button-reset", {
 
   onClick: function() {
     this.el.emit("resetBargeEvent");
-    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playPositionalSoundFollowing(
+      SOUND_SPAWN_EMOJI,
+      this.el.object3D
+    );
   }
 });
 
@@ -149,7 +193,10 @@ AFRAME.registerComponent("socialvr-barge-button-go", {
 
   onClick: function() {
     this.el.emit("startBargeEvent");
-    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playPositionalSoundFollowing(
+      SOUND_SPAWN_EMOJI,
+      this.el.object3D
+    );
   }
 });
 
@@ -162,7 +209,10 @@ AFRAME.registerComponent("socialvr-barge-button-stop", {
 
   onClick: function() {
     this.el.emit("stopBargeEvent");
-    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playPositionalSoundFollowing(
+      SOUND_SPAWN_EMOJI,
+      this.el.object3D
+    );
   }
 });
 
@@ -185,6 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
     buttonResetEl.setAttribute("material", "color: #3B56DC");
     buttonResetEl.setAttribute("socialvr-barge-button-reset", "");
     buttonResetEl.setAttribute("is-remote-hover-target", "");
+    buttonResetEl.setAttribute("hoverable-visuals", "");
     buttonResetEl.setAttribute("tags", "singleActionButton: true");
     buttonResetEl.setAttribute("css-class", "interactable");
     /**
@@ -220,6 +271,7 @@ document.addEventListener("DOMContentLoaded", () => {
     buttonGoEl.setAttribute("material", "color: #32CD32");
     buttonGoEl.setAttribute("socialvr-barge-button-go", "");
     buttonGoEl.setAttribute("is-remote-hover-target", "");
+    buttonGoEl.setAttribute("hoverable-visuals", "");
     buttonGoEl.setAttribute("tags", "singleActionButton: true");
     buttonGoEl.setAttribute("css-class", "interactable");
     /**
@@ -255,6 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
     buttonStopEl.setAttribute("material", "color: #FF0000");
     buttonStopEl.setAttribute("socialvr-barge-button-stop", "");
     buttonStopEl.setAttribute("is-remote-hover-target", "");
+    buttonStopEl.setAttribute("hoverable-visuals", "");
     buttonStopEl.setAttribute("tags", "singleActionButton: true");
     buttonStopEl.setAttribute("css-class", "interactable");
     /**
