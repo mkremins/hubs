@@ -1,6 +1,8 @@
 import { SOUND_SPAWN_EMOJI } from "./systems/sound-effects-system";
 
-const targetPosition = new THREE.Vector3(50, 0, 0);
+let targetKey = 0;
+const positionTable = [new THREE.Vector3(50, 0, 0), new THREE.Vector3(0, 0, 0), new THREE.Vector3(50, 0, 0)];
+const targetPosition = positionTable[targetKey];
 
 AFRAME.registerSystem("socialvr-barge", {
   init() {
@@ -64,14 +66,21 @@ AFRAME.registerComponent("socialvr-barge", {
       const currentPosition = this.el.object3D.position;
       const targetBargeNormalizedVector = new THREE.Vector3(0, 0, 0);
 
-      targetBargeNormalizedVector.x = targetPosition.x - currentPosition.x;
-      targetBargeNormalizedVector.y = targetPosition.y - currentPosition.y;
-      targetBargeNormalizedVector.z = targetPosition.z - currentPosition.z;
-      targetBargeNormalizedVector.normalize();
+      // Only move if the distance is enough to consider moving.
+      if (currentPosition.distanceToSquared(targetPosition) >= 1) {
+        targetBargeNormalizedVector.x = targetPosition.x - currentPosition.x;
+        targetBargeNormalizedVector.y = targetPosition.y - currentPosition.y;
+        targetBargeNormalizedVector.z = targetPosition.z - currentPosition.z;
+        targetBargeNormalizedVector.normalize();
 
-      // Move the barge.
-      this.el.object3D.translateOnAxis(targetBargeNormalizedVector, (this.data.speed / 1000) * timeDelta);
-      this.el.object3D.updateMatrix();
+        // Move the barge.
+        this.el.object3D.translateOnAxis(targetBargeNormalizedVector, (this.data.speed / 1000) * timeDelta);
+        this.el.object3D.updateMatrix();
+      } else {
+        targetKey = targetKey + 1;
+        console.log("GOING TO NEW POSITION!");
+        console.log("TARGET POSITION: " + targetPosition);
+      }
 
       /** 
       this.el.setAttribute("position", {
