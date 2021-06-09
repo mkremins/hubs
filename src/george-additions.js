@@ -1,4 +1,21 @@
-import { SOUND_PIN } from "./systems/sound-effects-system";
+import { Vector3 } from "three";
+import { SOUND_SPAWN_EMOJI } from "./systems/sound-effects-system";
+
+let lastKeyChange = 0;
+const positionTable = [];
+
+for (let i = 1; i < 100; i++) {
+  const wpname = "Waypoint_" + i;
+  const wp = document.querySelector("." + wpname);
+
+  if (!wp) {
+    break;
+  }
+
+  positionTable.push(wp.object3D.position);
+}
+
+console.log(`Registered ${positionTable.length} waypoints for the barge.`);
 
 AFRAME.registerSystem("socialvr-barge", {
   init() {
@@ -31,7 +48,8 @@ AFRAME.registerComponent("socialvr-barge", {
     height: { type: "number", default: 1 },
     depth: { type: "number", default: 4 },
     speed: { type: "number", default: 1 },
-    moving: { type: "boolean", default: false }
+    moving: { type: "boolean", default: false },
+    targetKey: { type: "number", default: 0 }
   },
 
   init() {
@@ -60,31 +78,59 @@ AFRAME.registerComponent("socialvr-barge", {
   tick(time, timeDelta) {
     if (this.data.moving) {
       const currentPosition = this.el.object3D.position;
+      const targetBargeNormalizedVector = new THREE.Vector3(0, 0, 0);
+      const targetPosition = positionTable[this.data.targetKey];
 
-      // Move the barge.
-      this.el.setAttribute("position", {
-        x: currentPosition.x + (this.data.speed / 1000) * timeDelta,
-        y: currentPosition.y,
-        z: currentPosition.z
-      });
+      // Only move if the distance is enough to consider moving.
+      if (currentPosition.distanceToSquared(targetPosition) >= 0.5) {
+        targetBargeNormalizedVector.x = targetPosition.x - currentPosition.x;
+        targetBargeNormalizedVector.y = targetPosition.y - currentPosition.y;
+        targetBargeNormalizedVector.z = targetPosition.z - currentPosition.z;
+        targetBargeNormalizedVector.normalize();
 
-      // Move avatar with the barge.
-      const bargeMinX = currentPosition.x - this.data.width / 2;
-      const bargeMaxX = currentPosition.x + this.data.width / 2;
-      const bargeMinZ = currentPosition.z - this.data.depth / 2;
-      const bargeMaxZ = currentPosition.z + this.data.depth / 2;
+        // Move the barge.
+        this.el.object3D.translateOnAxis(targetBargeNormalizedVector, (this.data.speed / 1000) * timeDelta);
+        this.el.object3D.updateMatrix();
 
-      const avatar = window.APP.componentRegistry["player-info"][0].el;
-      const avatarPosition = avatar.getAttribute("position");
+        // Move avatar with the barge.
+        const bargeMinX = currentPosition.x - this.data.width / 2;
+        const bargeMaxX = currentPosition.x + this.data.width / 2;
+        const bargeMinZ = currentPosition.z - this.data.depth / 2;
+        const bargeMaxZ = currentPosition.z + this.data.depth / 2;
 
-      if (
-        avatarPosition.x >= bargeMinX &&
-        avatarPosition.x <= bargeMaxX &&
-        avatarPosition.z >= bargeMinZ &&
-        avatarPosition.z <= bargeMaxZ
-      ) {
-        avatarPosition.x = avatarPosition.x + (this.data.speed / 1000) * timeDelta;
-        avatar.setAttribute("position", avatarPosition);
+        // const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
+        const avatar = window.APP.componentRegistry["player-info"][0].el;
+        const avatarPosition = avatar.getAttribute("position");
+        const tap = new THREE.Vector3();
+        tap.x = currentPosition.x - avatarPosition.x;
+        tap.y = currentPosition.y - avatarPosition.y;
+        tap.z = currentPosition.z - avatarPosition.z;
+        tap.normalize();
+
+        if (
+          avatarPosition.x >= bargeMinX &&
+          avatarPosition.x <= bargeMaxX &&
+          avatarPosition.z >= bargeMinZ &&
+          avatarPosition.z <= bargeMaxZ
+        ) {
+          avatar.object3D.translateOnAxis(tap, (this.data.speed / 1000) * timeDelta);
+          avatar.object3D.updateMatrix();
+        }
+      } else {
+        if (lastKeyChange) {
+          if (lastKeyChange >= time) {
+            lastKeyChange = time + this.data.speed * 8 * timeDelta;
+            this.data.targetKey = this.data.targetKey + 1;
+            console.log("GOING TO NEW POSITION!");
+            console.log("TARGET POSITION: " + JSON.stringify(targetPosition));
+          }
+        } else {
+          // First time we're setting the key.
+          lastKeyChange = time + this.data.speed * 8 * timeDelta;
+          this.data.targetKey = this.data.targetKey + 1;
+          console.log("GOING TO NEW POSITION!");
+          console.log("TARGET POSITION: " + JSON.stringify(targetPosition));
+        }
       }
     }
   },
@@ -102,7 +148,29 @@ AFRAME.registerComponent("socialvr-barge", {
   // eslint-disable-next-line no-unused-vars
   _resetBarge(senderId, dataType, data, targetId) {
     this.data.moving = false;
+    this.data.targetKey = 0;
     this.el.setAttribute("position", { x: 0, y: 0, z: 0 });
+
+    /**
+     * Player Teleportation
+     *
+    const avatar = window.APP.componentRegistry["player-info"][0].el;
+    const avatarPosition = avatar.getAttribute("position");
+    const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
+
+    if (
+      avatarPosition.x >= bargeMinX &&
+      avatarPosition.x <= bargeMaxX &&
+      avatarPosition.z >= bargeMinZ &&
+      avatarPosition.z <= bargeMaxZ
+    ) {
+      avatarPosition.x = avatarPosition.x + (this.data.speed / 1000) * timeDelta;
+      avatar.setAttribute("position", avatarPosition);
+    }
+
+    console.log(player.el.getAttribute("position"));
+    player.teleportTo(this.el.getAttribute("position"));
+    */
   },
 
   startBarge() {
@@ -136,7 +204,10 @@ AFRAME.registerComponent("socialvr-barge-button-reset", {
 
   onClick: function() {
     this.el.emit("resetBargeEvent");
-    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playPositionalSoundFollowing(
+      SOUND_SPAWN_EMOJI,
+      this.el.object3D
+    );
   }
 });
 
@@ -149,7 +220,10 @@ AFRAME.registerComponent("socialvr-barge-button-go", {
 
   onClick: function() {
     this.el.emit("startBargeEvent");
-    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playPositionalSoundFollowing(
+      SOUND_SPAWN_EMOJI,
+      this.el.object3D
+    );
   }
 });
 
@@ -162,7 +236,10 @@ AFRAME.registerComponent("socialvr-barge-button-stop", {
 
   onClick: function() {
     this.el.emit("stopBargeEvent");
-    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playSoundOneShot(SOUND_PIN);
+    this.el.sceneEl.systems["hubs-systems"].soundEffectsSystem.playPositionalSoundFollowing(
+      SOUND_SPAWN_EMOJI,
+      this.el.object3D
+    );
   }
 });
 
@@ -185,6 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
     buttonResetEl.setAttribute("material", "color: #3B56DC");
     buttonResetEl.setAttribute("socialvr-barge-button-reset", "");
     buttonResetEl.setAttribute("is-remote-hover-target", "");
+    buttonResetEl.setAttribute("hoverable-visuals", "");
     buttonResetEl.setAttribute("tags", "singleActionButton: true");
     buttonResetEl.setAttribute("css-class", "interactable");
     /**
@@ -220,6 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
     buttonGoEl.setAttribute("material", "color: #32CD32");
     buttonGoEl.setAttribute("socialvr-barge-button-go", "");
     buttonGoEl.setAttribute("is-remote-hover-target", "");
+    buttonGoEl.setAttribute("hoverable-visuals", "");
     buttonGoEl.setAttribute("tags", "singleActionButton: true");
     buttonGoEl.setAttribute("css-class", "interactable");
     /**
@@ -255,6 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
     buttonStopEl.setAttribute("material", "color: #FF0000");
     buttonStopEl.setAttribute("socialvr-barge-button-stop", "");
     buttonStopEl.setAttribute("is-remote-hover-target", "");
+    buttonStopEl.setAttribute("hoverable-visuals", "");
     buttonStopEl.setAttribute("tags", "singleActionButton: true");
     buttonStopEl.setAttribute("css-class", "interactable");
     /**
