@@ -4,19 +4,6 @@ import { SOUND_SPAWN_EMOJI } from "./systems/sound-effects-system";
 let lastKeyChange = 0;
 const positionTable = [];
 
-for (let i = 1; i < 100; i++) {
-  const wpname = "Waypoint_" + i;
-  const wp = document.querySelector("." + wpname);
-
-  if (!wp) {
-    break;
-  }
-
-  positionTable.push(wp.object3D.position);
-}
-
-console.log(`Registered ${positionTable.length} waypoints for the barge.`);
-
 AFRAME.registerSystem("socialvr-barge", {
   init() {
     this.barge = null;
@@ -28,6 +15,33 @@ AFRAME.registerSystem("socialvr-barge", {
     }
 
     this.barge = ent;
+
+    for (let i = 1; i < 100; i++) {
+      const wpname = "Waypoint_" + i;
+      const wp = document.querySelector("." + wpname);
+
+      if (wp) {
+        positionTable.push(wp.object3D.position);
+      }
+    }
+
+    console.log(`Registered ${positionTable.length} waypoints for the barge.`);
+
+    if (positionTable.length < 1) {
+      console.warn("No waypoints found!");
+      console.warn("Registering some default waypoints for the barge.");
+
+      positionTable.push(new Vector3(25, 0, 0));
+      positionTable.push(new Vector3(25, 0, 25));
+      positionTable.push(new Vector3(0, 25, 0));
+      positionTable.push(new Vector3(0, 0, 0));
+    }
+
+    // We need to push a blank vector for the end.
+    positionTable.push(new Vector3(0, 0, 0));
+
+    console.log(positionTable);
+
     ent.el.emit("bargeregistered", { bargeEnt: ent });
 
     // Util
@@ -78,8 +92,12 @@ AFRAME.registerComponent("socialvr-barge", {
   tick(time, timeDelta) {
     if (this.data.moving) {
       const currentPosition = this.el.object3D.position;
-      const targetBargeNormalizedVector = new THREE.Vector3(0, 0, 0);
+      const targetBargeNormalizedVector = new Vector3(0, 0, 0);
       const targetPosition = positionTable[this.data.targetKey];
+
+      if (!targetPosition) {
+        return;
+      }
 
       // Only move if the distance is enough to consider moving.
       if (currentPosition.distanceToSquared(targetPosition) >= 0.5) {
@@ -101,7 +119,7 @@ AFRAME.registerComponent("socialvr-barge", {
         // const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
         const avatar = window.APP.componentRegistry["player-info"][0].el;
         const avatarPosition = avatar.getAttribute("position");
-        const tap = new THREE.Vector3();
+        const tap = new Vector3();
         tap.x = currentPosition.x - avatarPosition.x;
         tap.y = currentPosition.y - avatarPosition.y;
         tap.z = currentPosition.z - avatarPosition.z;
@@ -119,14 +137,14 @@ AFRAME.registerComponent("socialvr-barge", {
       } else {
         if (lastKeyChange) {
           if (lastKeyChange >= time) {
-            lastKeyChange = time + this.data.speed * 8 * timeDelta;
+            lastKeyChange = time + 100;
             this.data.targetKey = this.data.targetKey + 1;
             console.log("GOING TO NEW POSITION!");
             console.log("TARGET POSITION: " + JSON.stringify(targetPosition));
           }
         } else {
           // First time we're setting the key.
-          lastKeyChange = time + this.data.speed * 8 * timeDelta;
+          lastKeyChange = time + 100;
           this.data.targetKey = this.data.targetKey + 1;
           console.log("GOING TO NEW POSITION!");
           console.log("TARGET POSITION: " + JSON.stringify(targetPosition));
