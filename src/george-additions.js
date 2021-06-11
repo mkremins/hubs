@@ -1,5 +1,6 @@
 import { Vector3 } from "three";
 import { SOUND_SPAWN_EMOJI } from "./systems/sound-effects-system";
+import { waitForDOMContentLoaded } from "./utils/async-utils";
 
 let lastKeyChange = 0;
 const positionTable = [];
@@ -71,6 +72,7 @@ AFRAME.registerComponent("socialvr-barge", {
     this.geometry = new THREE.BoxBufferGeometry(this.data.width, this.data.height, this.data.depth);
     this.material = new THREE.MeshStandardMaterial({ color: "#AAA" });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.directionVec3 = new THREE.Vector3();
 
     this.el.setObject3D("mesh", this.mesh);
     this.el.addEventListener("startBargeEvent", this.startBarge.bind(this));
@@ -92,23 +94,29 @@ AFRAME.registerComponent("socialvr-barge", {
   tick(time, timeDelta) {
     if (this.data.moving) {
       const currentPosition = this.el.object3D.position;
-      const targetBargeNormalizedVector = new Vector3(0, 0, 0);
       const targetPosition = positionTable[this.data.targetKey];
+      const directionVec3 = this.directionVec3;
 
       if (!targetPosition) {
         return;
       }
 
-      // Only move if the distance is enough to consider moving.
-      if (currentPosition.distanceToSquared(targetPosition) >= 0.5) {
-        targetBargeNormalizedVector.x = targetPosition.x - currentPosition.x;
-        targetBargeNormalizedVector.y = targetPosition.y - currentPosition.y;
-        targetBargeNormalizedVector.z = targetPosition.z - currentPosition.z;
-        targetBargeNormalizedVector.normalize();
+      directionVec3.copy(targetPosition).sub(currentPosition);
+      const distance = directionVec3.length();
 
-        // Move the barge.
-        this.el.object3D.translateOnAxis(targetBargeNormalizedVector, (this.data.speed / 1000) * timeDelta);
-        this.el.object3D.updateMatrix();
+      // Only move if the distance is enough to consider moving.
+      if (currentPosition.distanceToSquared(targetPosition) > 1) {
+        const factor = this.data.speed / distance;
+
+        ["x", "y", "z"].forEach(function(axis) {
+          directionVec3[axis] *= factor * (timeDelta / 1000);
+        });
+
+        this.el.setAttribute("position", {
+          x: currentPosition.x + directionVec3.x,
+          y: currentPosition.y + directionVec3.y,
+          z: currentPosition.z + directionVec3.z
+        });
 
         // Move avatar with the barge.
         const bargeMinX = currentPosition.x - this.data.width / 2;
@@ -119,11 +127,6 @@ AFRAME.registerComponent("socialvr-barge", {
         // const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
         const avatar = window.APP.componentRegistry["player-info"][0].el;
         const avatarPosition = avatar.getAttribute("position");
-        const tap = new Vector3();
-        tap.x = currentPosition.x - avatarPosition.x;
-        tap.y = currentPosition.y - avatarPosition.y;
-        tap.z = currentPosition.z - avatarPosition.z;
-        tap.normalize();
 
         if (
           avatarPosition.x >= bargeMinX &&
@@ -131,22 +134,31 @@ AFRAME.registerComponent("socialvr-barge", {
           avatarPosition.z >= bargeMinZ &&
           avatarPosition.z <= bargeMaxZ
         ) {
-          avatar.object3D.translateOnAxis(tap, (this.data.speed / 1000) * timeDelta);
-          avatar.object3D.updateMatrix();
+          avatar.setAttribute("position", {
+            x: avatarPosition.x + directionVec3.x,
+            y: avatarPosition.y + directionVec3.y,
+            z: avatarPosition.z + directionVec3.z
+          });
         }
       } else {
         if (lastKeyChange) {
-          if (lastKeyChange >= time) {
+          if (time >= lastKeyChange) {
             lastKeyChange = time + 100;
             this.data.targetKey = this.data.targetKey + 1;
             console.log("GOING TO NEW POSITION!");
+            console.log("TARGET KEY: " + this.data.targetKey);
             console.log("TARGET POSITION: " + JSON.stringify(targetPosition));
+          } else {
+            console.log("I'm not allowed to do that yet!!!");
+            console.log("LAST KEY CHANGE: " + lastKeyChange);
+            console.log("TIME: " + time);
           }
         } else {
           // First time we're setting the key.
           lastKeyChange = time + 100;
           this.data.targetKey = this.data.targetKey + 1;
           console.log("GOING TO NEW POSITION!");
+          console.log("TARGET KEY: " + this.data.targetKey);
           console.log("TARGET POSITION: " + JSON.stringify(targetPosition));
         }
       }
@@ -168,27 +180,6 @@ AFRAME.registerComponent("socialvr-barge", {
     this.data.moving = false;
     this.data.targetKey = 0;
     this.el.setAttribute("position", { x: 0, y: 0, z: 0 });
-
-    /**
-     * Player Teleportation
-     *
-    const avatar = window.APP.componentRegistry["player-info"][0].el;
-    const avatarPosition = avatar.getAttribute("position");
-    const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
-
-    if (
-      avatarPosition.x >= bargeMinX &&
-      avatarPosition.x <= bargeMaxX &&
-      avatarPosition.z >= bargeMinZ &&
-      avatarPosition.z <= bargeMaxZ
-    ) {
-      avatarPosition.x = avatarPosition.x + (this.data.speed / 1000) * timeDelta;
-      avatar.setAttribute("position", avatarPosition);
-    }
-
-    console.log(player.el.getAttribute("position"));
-    player.teleportTo(this.el.getAttribute("position"));
-    */
   },
 
   startBarge() {
@@ -261,13 +252,12 @@ AFRAME.registerComponent("socialvr-barge-button-stop", {
   }
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+waitForDOMContentLoaded().then(() => {
   const sceneEl = document.querySelector("a-scene");
   const bargeEl = document.createElement("a-entity");
 
   bargeEl.setAttribute("socialvr-barge", "");
   bargeEl.addEventListener("bargeregistered", function(event) {
-    // console.log("NEW ENT REGISTERED", event.detail.bargeEnt);
     const bargeEl = event.detail.bargeEnt.el;
 
     /** 
