@@ -48,6 +48,7 @@ export class CharacterControllerSystem {
   constructor(scene) {
     this.scene = scene;
     this.fly = false;
+    this.barge = false;
     this.shouldLandWhenPossible = false;
     this.waypoints = [];
     this.waypointTravelStartTime = 0;
@@ -221,6 +222,8 @@ export class CharacterControllerSystem {
           this.sfx.playSoundOneShot(SOUND_WAYPOINT_END);
         }
       }
+
+      this.fly = this.barge;
 
       const userinput = AFRAME.scenes[0].systems.userinput;
       const wasFlying = this.fly;

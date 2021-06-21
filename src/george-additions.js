@@ -1,9 +1,10 @@
 import { Vector3 } from "three";
 import { SOUND_SPAWN_EMOJI } from "./systems/sound-effects-system";
 import { waitForDOMContentLoaded } from "./utils/async-utils";
+import { getCurrentPlayerHeight } from "./utils/get-current-player-height";
 
 let lastKeyChange = 0;
-const positionTable = [];
+let positionTable = [];
 
 AFRAME.registerSystem("socialvr-barge", {
   init() {
@@ -65,8 +66,18 @@ AFRAME.registerComponent("socialvr-barge", {
   },
 
   tick(time, timeDelta) {
+    const currentPosition = this.el.object3D.position;
+
+    const bargeMinX = currentPosition.x - this.data.width / 2;
+    const bargeMaxX = currentPosition.x + this.data.width / 2;
+    const bargeMinZ = currentPosition.z - this.data.depth / 2;
+    const bargeMaxZ = currentPosition.z + this.data.depth / 2;
+
+    const avatar = window.APP.componentRegistry["player-info"][0];
+    const avatarPosition = avatar.el.getAttribute("position");
+    const characterController = this.el.sceneEl.systems["hubs-systems"].characterController;
+
     if (this.data.moving) {
-      const currentPosition = this.el.object3D.position;
       const targetPosition = positionTable[this.data.targetKey];
       const directionVec3 = this.directionVec3;
 
@@ -91,29 +102,38 @@ AFRAME.registerComponent("socialvr-barge", {
           z: currentPosition.z + directionVec3.z
         });
 
-        // Move avatar with the barge.
-        const bargeMinX = currentPosition.x - this.data.width / 2;
-        const bargeMaxX = currentPosition.x + this.data.width / 2;
-        const bargeMinZ = currentPosition.z - this.data.depth / 2;
-        const bargeMaxZ = currentPosition.z + this.data.depth / 2;
-
-        // const characterController = AFRAME.scenes[0].systems["hubs-systems"].characterController;
-        const avatar = window.APP.componentRegistry["player-info"][0].el;
-        const avatarPosition = avatar.getAttribute("position");
-
         if (
           avatarPosition.x >= bargeMinX &&
           avatarPosition.x <= bargeMaxX &&
           avatarPosition.z >= bargeMinZ &&
           avatarPosition.z <= bargeMaxZ
         ) {
-          avatar.setAttribute("position", {
+          characterController.barge = true;
+          /**
+          avatar.el.setAttribute("position", {
             x: avatarPosition.x + directionVec3.x,
             y: avatarPosition.y + directionVec3.y,
             z: avatarPosition.z + directionVec3.z
           });
+          **/
+          avatar.el.setAttribute("position", {
+            x: avatarPosition.x + directionVec3.x,
+            y: currentPosition.y + getCurrentPlayerHeight() - this.data.height,
+            z: avatarPosition.z + directionVec3.z
+          });
+        } else {
+          characterController.barge = false;
         }
       } else {
+        if (
+          avatarPosition.x < bargeMinX &&
+          avatarPosition.x > bargeMaxX &&
+          avatarPosition.z < bargeMinZ &&
+          avatarPosition.z > bargeMaxZ
+        ) {
+          characterController.barge = false;
+        }
+
         if (lastKeyChange) {
           if (time >= lastKeyChange) {
             lastKeyChange = time + 100;
@@ -135,11 +155,30 @@ AFRAME.registerComponent("socialvr-barge", {
           console.log("TARGET POSITION: " + JSON.stringify(targetPosition));
         }
       }
+    } else {
+      if (
+        avatarPosition.x >= bargeMinX &&
+        avatarPosition.x <= bargeMaxX &&
+        avatarPosition.z >= bargeMinZ &&
+        avatarPosition.z <= bargeMaxZ
+      ) {
+        characterController.barge = true;
+
+        avatar.el.setAttribute("position", {
+          x: avatarPosition.x,
+          y: currentPosition.y + getCurrentPlayerHeight() - this.data.height,
+          z: avatarPosition.z
+        });
+      } else {
+        characterController.barge = false;
+      }
     }
   },
 
   // eslint-disable-next-line no-unused-vars
   _startBarge(senderId, dataType, data, targetId) {
+    positionTable = [];
+
     for (let i = 1; i < 100; i++) {
       const wpname = "Waypoint_" + i;
       const wp = document.querySelector("." + wpname);
@@ -155,8 +194,8 @@ AFRAME.registerComponent("socialvr-barge", {
       console.warn("No waypoints found!");
       console.warn("Registering some default waypoints for the barge.");
 
-      positionTable.push(new Vector3(25, 0, 0));
-      positionTable.push(new Vector3(25, 0, 25));
+      positionTable.push(new Vector3(0, 25, 0));
+      positionTable.push(new Vector3(0, 0, 0));
       positionTable.push(new Vector3(0, 25, 0));
       positionTable.push(new Vector3(0, 0, 0));
     }
