@@ -184,7 +184,7 @@ AFRAME.registerComponent("socialvr-barge", {
       const wp = document.querySelector("." + wpname);
 
       if (wp) {
-        positionTable.push(wp.object3D.position);
+        positionTable.push(wp.object3D.position.negate());
       }
     }
 
@@ -200,10 +200,7 @@ AFRAME.registerComponent("socialvr-barge", {
       positionTable.push(new Vector3(0, 0, 0));
     }
 
-    // We need to push a blank vector for the end.
-    positionTable.push(new Vector3(0, 0, 0));
     console.log(positionTable);
-
     this.data.moving = true;
   },
 
