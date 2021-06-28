@@ -30,9 +30,16 @@ import { AudioSystem } from "./audio-system";
 import { ShadowSystem } from "./shadow-system";
 import { MediaFramesSystem } from "./media-frames";
 import { InspectYourselfSystem } from "./inspect-yourself-system";
-import { DataVisualizationSystem } from "./datavisualization-system";
 import "../max-additions";
-import "../george-additions";
+
+// import "../george-additions";
+// Should probably move this after register systems just in case
+import "../social-vr/components/barge";
+import "../social-vr/components/barge-button-reset";
+import "../social-vr/components/barge-button-stop";
+import "../social-vr/components/barge-button-go";
+import "../social-vr/systems/barge";
+import "../social-vr/main";
 
 AFRAME.registerSystem("hubs-systems", {
   init() {
@@ -72,7 +79,6 @@ AFRAME.registerSystem("hubs-systems", {
     this.shadowSystem = new ShadowSystem(this.el);
     this.mediaFramesSystem = new MediaFramesSystem(this.physicsSystem, this.el.systems.interaction);
     this.inspectYourselfSystem = new InspectYourselfSystem();
-    this.datavisualizationSystem = new DataVisualizationSystem(this.el);
   },
 
   tick(t, dt) {
@@ -120,9 +126,6 @@ AFRAME.registerSystem("hubs-systems", {
 
     // We run this late in the frame so that its the last thing to have an opinion about the scale of an object
     this.boneVisibilitySystem.tick();
-
-    // Data visualization shouldn't impact other things
-    this.datavisualizationSystem.tick();
   },
 
   remove() {
