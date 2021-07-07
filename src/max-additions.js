@@ -284,9 +284,9 @@ function startSpeech(senderId, dataType, data, targetId) {
   const centerPos = centerObj
     ? centerObj.object3D.position.clone()
     : new THREE.Vector3(...ORB_CONTAINER_POS);
-  centerPos.y = 3;
+  centerPos.y = 2;
   const playerPos = playerInfo.el.object3D.position.clone();
-  playerPos.y = 3;
+  playerPos.y = 2;
   const offset = new THREE.Vector3().subVectors(playerPos, centerPos).normalize();
   const orbPos = new THREE.Vector3().addVectors(centerPos, offset);
   newOrb.setAttribute("position", orbPos);
